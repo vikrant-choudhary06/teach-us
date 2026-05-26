@@ -10,18 +10,18 @@ const StepCard = ({ step, title, description, icon, index }) => (
     transition={{ duration: 0.6, delay: index * 0.1 }}
     className="h-full"
   >
-    <div className="rounded-2xl border border-gray-200 bg-white p-8 hover:border-indigo-300 transition-colors h-full">
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.01] p-8 hover:border-emerald-500/30 hover:bg-white/[0.02] transition-all h-full">
       <div className="flex items-center gap-4 mb-4">
         <motion.div
           whileHover={{ scale: 1.1 }}
-          className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg"
+          className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-emerald-600 to-green-500 flex items-center justify-center text-white font-bold text-lg shadow-lg"
         >
           {step}
         </motion.div>
         <div className="text-3xl">{icon}</div>
       </div>
-      <h3 className="text-xl font-bold text-gray-900 mb-3">{title}</h3>
-      <p className="text-gray-600 leading-relaxed">{description}</p>
+      <h3 className="text-xl font-bold text-white mb-3">{title}</h3>
+      <p className="text-gray-400 text-sm leading-relaxed">{description}</p>
     </div>
   </motion.div>
 );
@@ -75,9 +75,15 @@ export default function HowItWorksSection() {
   return (
     <section
       id="how-it-works"
-      className="section-padding bg-gradient-to-b from-white via-purple-50 to-white"
+      className="section-padding bg-black relative overflow-hidden"
     >
-      <div className="container-custom">
+      {/* Background Glows */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute top-[20%] right-[-10%] w-[400px] h-[400px] bg-emerald-600/5 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[20%] left-[-10%] w-[400px] h-[400px] bg-green-600/5 rounded-full blur-[100px]" />
+      </div>
+
+      <div className="container-custom relative z-10">
         {/* Section Header */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -89,14 +95,14 @@ export default function HowItWorksSection() {
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="inline-block px-4 py-2 rounded-full bg-purple-100 text-purple-700 text-sm font-semibold mb-4"
+            className="inline-block px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-4"
           >
             Simple Process
           </motion.span>
-          <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-            How TeacherHub Works
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
+            How Acharya AI Works
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-lg text-gray-400 max-w-3xl mx-auto">
             Get started in minutes and start transforming your classroom today
           </p>
         </motion.div>
@@ -114,10 +120,10 @@ export default function HowItWorksSection() {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="mt-20 pt-12 border-t border-gray-200"
+          className="mt-24 pt-12 border-t border-white/[0.08]"
         >
           <div className="max-w-4xl mx-auto">
-            <h3 className="text-2xl font-bold text-gray-900 mb-12 text-center">
+            <h3 className="text-2xl font-bold text-white mb-12 text-center">
               Your Success Timeline
             </h3>
 
@@ -155,38 +161,24 @@ export default function HowItWorksSection() {
                   <div className="flex-shrink-0">
                     <motion.div
                       whileHover={{ scale: 1.2 }}
-                      className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold"
+                      className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-600 to-green-500 flex items-center justify-center text-white font-bold"
                     >
                       {i + 1}
                     </motion.div>
                   </div>
                   <div className="flex-grow">
-                    <h4 className="text-sm font-bold text-indigo-600 uppercase tracking-wide mb-1">
+                    <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide mb-1">
                       {milestone.time}
                     </h4>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className="text-lg font-semibold text-white">
                       {milestone.event}
                     </p>
-                    <p className="text-gray-600 mt-1">{milestone.desc}</p>
+                    <p className="text-gray-400 text-sm mt-1">{milestone.desc}</p>
                   </div>
                 </motion.div>
               ))}
             </div>
           </div>
-        </motion.div>
-
-        {/* CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.5 }}
-          className="mt-16 text-center"
-        >
-          <button className="button-primary inline-flex items-center gap-2 group">
-            Start Your Free Trial
-            <HiArrowRight className="group-hover:translate-x-1 transition-transform" />
-          </button>
         </motion.div>
       </div>
     </section>

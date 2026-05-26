@@ -1,15 +1,28 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@theme {
+  --color-brand-emerald: #10b981;
+  --color-brand-green: #22c55e;
+  --color-brand-mint: #34d399;
+  --color-dark-bg: #000000;
+  --color-dark-card: rgba(255, 255, 255, 0.02);
+  --font-space: 'Space Grotesk', sans-serif;
+  --font-sans: 'Inter', sans-serif;
+}
 
 @layer base {
   html {
     scroll-behavior: smooth;
     overflow-x: hidden;
+    background-color: #000000;
   }
 
   body {
-    @apply bg-white text-gray-900 antialiased;
+    @apply bg-black text-white antialiased;
     margin: 0;
     overflow-x: hidden;
+    font-family: 'Inter', 'Manrope', sans-serif;
   }
 
   #root {
@@ -18,6 +31,7 @@
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
+    background-color: #000000;
   }
 }
 
@@ -27,32 +41,53 @@
   }
 
   .gradient-text {
-    @apply bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-500 bg-clip-text text-transparent;
   }
 
   .glass-effect {
-    @apply backdrop-blur-sm bg-white/80 border border-gray-200/80 rounded-xl shadow-lg;
+    @apply backdrop-blur-md bg-white/[0.02] border border-white/[0.07] rounded-xl shadow-2xl;
+  }
+
+  .glass-navbar {
+    @apply backdrop-blur-lg bg-white/[0.03] border border-white/[0.08] rounded-full px-6 py-2 shadow-xl;
   }
 
   .button-primary {
-    @apply px-6 py-3 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors duration-300 shadow-lg hover:shadow-xl;
+    @apply px-6 py-3 rounded-full bg-white text-black font-semibold hover:bg-gray-100 transition-all duration-300 shadow-lg hover:shadow-white/5;
   }
 
   .button-secondary {
-    @apply px-6 py-3 rounded-lg border-2 border-indigo-600 text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors duration-300;
+    @apply px-6 py-3 rounded-full border border-white/20 text-white font-semibold hover:bg-white/10 transition-all duration-300;
   }
 
   .card-hover {
-    @apply transition-all duration-300 hover:shadow-xl hover:scale-105;
+    @apply transition-all duration-300 hover:shadow-2xl hover:shadow-emerald-500/5 hover:border-emerald-500/30 hover:bg-white/[0.04];
   }
 
   .section-padding {
-    @apply py-16 sm:py-20 lg:py-24;
+    @apply py-20 sm:py-24 lg:py-28;
   }
 
   .input-field {
-    @apply w-full rounded-lg border border-gray-200 bg-white py-3 text-gray-900 placeholder-gray-400 shadow-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20;
+    @apply w-full rounded-lg border border-white/10 bg-white/[0.02] py-3 text-white placeholder-gray-500 shadow-sm transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20;
   }
+}
+
+/* Custom Grid Background */
+.grid-bg {
+  background-image: 
+    linear-gradient(to right, rgba(16, 185, 129, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.04) 1px, transparent 1px);
+  background-size: 4rem 4rem;
+}
+
+/* Custom Glows */
+.radial-glow {
+  background: radial-gradient(circle at center, rgba(16, 185, 129, 0.12) 0%, transparent 65%);
+}
+
+.radial-glow-mint {
+  background: radial-gradient(circle at center, rgba(52, 211, 153, 0.08) 0%, transparent 70%);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -67,22 +102,26 @@
     transform: translate(0, 0) scale(1);
   }
   25% {
-    transform: translate(20px, -50px) scale(1.1);
+    transform: translate(20px, -30px) scale(1.05);
   }
   50% {
-    transform: translate(-20px, 20px) scale(0.9);
+    transform: translate(-10px, 15px) scale(0.95);
   }
   75% {
-    transform: translate(50px, 50px) scale(1.05);
+    transform: translate(30px, 30px) scale(1.02);
   }
 }
 
 .animate-blob {
-  animation: blob 7s infinite;
+  animation: blob 8s infinite ease-in-out;
 }
 
 .animation-delay-2000 {
   animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
 }
 
 ::-webkit-scrollbar {
@@ -90,21 +129,21 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #000000;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c7d9ff;
+  background: #111827;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #818aff;
+  background: #10b981;
 }
 
 button:focus-visible,
 a:focus-visible,
 input:focus-visible {
-  outline: 2px solid #4f46e5;
+  outline: 2px solid #10b981;
   outline-offset: 2px;
 }

@@ -1,203 +1,258 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { HiChevronLeft, HiChevronRight, HiStar } from 'react-icons/hi';
+import React from 'react';
+import { motion } from 'framer-motion';
 
-const TestimonialCard = ({ name, role, content, image, isActive }) => (
-  <motion.div
-    initial={{ opacity: 0, scale: 0.95 }}
-    animate={{
-      opacity: isActive ? 1 : 0.5,
-      scale: isActive ? 1 : 0.95,
-    }}
-    exit={{ opacity: 0 }}
-    transition={{ duration: 0.4 }}
-    className={`rounded-2xl border ${
-      isActive
-        ? 'border-indigo-300 bg-gradient-to-br from-indigo-50 to-white shadow-xl'
-        : 'border-gray-200 bg-white'
-    } p-8 transition-all`}
+const HeartIcon = () => (
+  <svg
+    className="w-3.5 h-3.5 mr-1.5 text-emerald-400 select-none pointer-events-none"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    viewBox="0 0 24 24"
   >
-    {/* Rating */}
-    <div className="flex gap-1 mb-4">
-      {[...Array(5)].map((_, i) => (
-        <HiStar
-          key={i}
-          size={20}
-          className="text-yellow-400"
-          fill="currentColor"
-        />
-      ))}
-    </div>
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M4.318 6.318a4.5 4.5 0 0 0 0 6.364L12 20.364l7.682-7.682a4.5 4.5 0 0 0-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 0 0-6.364 0z"
+    />
+  </svg>
+);
 
-    {/* Testimonial Content */}
-    <p className="text-lg text-gray-900 font-medium leading-relaxed mb-6">
-      "{content}"
+const ClockIcon = () => (
+  <svg
+    className="w-5.5 h-5.5 text-emerald-400"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    viewBox="0 0 24 24"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+  </svg>
+);
+
+const WatermarkClock = () => (
+  <svg
+    className="w-full h-full text-white/[0.015]"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    viewBox="0 0 24 24"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+  </svg>
+);
+
+const StarRating = () => (
+  <div className="flex gap-1 mb-3 text-[#a3e635]">
+    {Array.from({ length: 5 }).map((_, i) => (
+      <svg key={i} className="w-4 h-4 fill-current" viewBox="0 0 20 20">
+        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 0 0 .95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 0 0-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 0 0-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 0 0-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 0 0 .951-.69l1.07-3.292z" />
+      </svg>
+    ))}
+  </div>
+);
+
+const TestimonialCard = ({ item }) => (
+  <div className="w-[300px] sm:w-[360px] shrink-0 relative rounded-[2rem] border border-white/[0.06] bg-[#0d1015]/90 p-6 sm:p-7 flex flex-col gap-4 hover:border-white/15 transition-all duration-300 select-none">
+    {/* 5-Star Rating */}
+    <StarRating />
+
+    {/* Quote */}
+    <p className="text-gray-300 text-xs sm:text-sm leading-relaxed italic min-h-[64px]">
+      {item.quote}
     </p>
 
-    {/* Author */}
-    <div className="flex items-center gap-4">
-      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
-        {image}
-      </div>
+    {/* Author Info */}
+    <div className="flex items-center gap-3.5 mt-2">
+      <img
+        src={item.avatar}
+        alt={item.name}
+        className="w-10 h-10 rounded-full object-cover border border-white/10 shrink-0"
+        loading="lazy"
+      />
       <div>
-        <p className="font-bold text-gray-900">{name}</p>
-        <p className="text-sm text-gray-600">{role}</p>
+        <h4 className="font-semibold text-white text-xs sm:text-sm leading-tight">
+          {item.name}
+        </h4>
+        <p className="text-gray-400 text-[10px] sm:text-xs mt-0.5">
+          {item.role}
+        </p>
       </div>
     </div>
-  </motion.div>
+  </div>
 );
 
 export default function TestimonialsSection() {
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  const testimonials = [
+  const row1Testimonials = [
     {
-      name: 'Sarah Mitchell',
-      role: 'High School Biology Teacher',
-      content:
-        'TeacherHub has completely transformed how I manage my classroom. Attendance tracking is seamless, and my students love how organized everything is. I save at least 5 hours per week!',
-      image: 'S',
+      quote: '"The Math Helper tool generates incredible word problems that relate to Indian contexts. My students are far more engaged than ever before."',
+      name: 'Rahul Verma',
+      role: 'Math Teacher, St. Xavier\'s',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=120&h=120',
     },
     {
-      name: 'James Rodriguez',
-      role: 'Middle School Math Teacher',
-      content:
-        'The grading system is intuitive and the analytics help me identify struggling students immediately. I can now spend more time teaching instead of managing paperwork.',
-      image: 'J',
+      quote: '"It evaluates open-ended answers with such precision. This is the first AI tool I\'ve seen that actually understands the CBSE grading rubric."',
+      name: 'Sunita Kulkarni',
+      role: 'History Teacher, Kendriya Vidyalaya',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=120&h=120',
     },
     {
-      name: 'Emily Chen',
-      role: 'Elementary School Principal',
-      content:
-        'As a principal, having visibility into all classroom activities through TeacherHub is invaluable. It\'s improved teacher efficiency and student outcomes across the board.',
-      image: 'E',
-    },
-    {
-      name: 'Michael Adams',
-      role: 'Special Education Coordinator',
-      content:
-        'The student records feature is incredibly detailed and easy to navigate. It\'s perfect for IEP meetings and parent conferences. Highly recommended!',
-      image: 'M',
-    },
-    {
-      name: 'Lisa Thompson',
-      role: 'Distance Learning Instructor',
-      content:
-        'Perfect for virtual and hybrid learning. My students submit assignments online, I grade them, and everyone can see progress in real-time. A game changer!',
-      image: 'L',
+      quote: '"The ability to generate content in regional languages is what sets Acharya AI apart. My students feel more connected to the material."',
+      name: 'Amit Patel',
+      role: 'Science Teacher, Delhi Public School',
+      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=120&h=120',
     },
   ];
 
-  const nextSlide = () => {
-    setActiveIndex((prev) => (prev + 1) % testimonials.length);
-  };
+  const row2Testimonials = [
+    {
+      quote: '"The Story Generator saves me hours of writing custom comprehension passages. The kids love the Indian mythology themes I can incorporate so easily."',
+      name: 'Priya Sharma',
+      role: 'English Teacher, DAV Public School',
+      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=120&h=120',
+    },
+    {
+      quote: '"Creating custom rubrics for our lab reports used to take all Sunday. With Acharya AI, I get detailed grading templates in seconds."',
+      name: 'Vikram Sengupta',
+      role: 'Physics Teacher, Birla High School',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=120&h=120',
+    },
+    {
+      quote: '"The quiz generator is a lifesaver. I can create multiple versions of formative tests for my classes in under two minutes!"',
+      name: 'Deepa Nair',
+      role: 'Primary Teacher, Chinmaya Vidyalaya',
+      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=120&h=120',
+    },
+  ];
 
-  const prevSlide = () => {
-    setActiveIndex((prev) =>
-      prev === 0 ? testimonials.length - 1 : prev - 1
-    );
-  };
+  // Double the arrays for infinite marquee scrolling
+  const doubleRow1 = [...row1Testimonials, ...row1Testimonials];
+  const doubleRow2 = [...row2Testimonials, ...row2Testimonials];
 
   return (
-    <section
-      id="testimonials"
-      className="section-padding bg-gradient-to-b from-white to-indigo-50"
-    >
-      <div className="container-custom">
-        {/* Section Header */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="mb-16 text-center"
-        >
-          <motion.span
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
+    <section id="testimonials" className="py-24 sm:py-32 bg-black relative overflow-hidden border-t border-white/[0.04]">
+      
+      {/* CSS Animations for Horizontal Marquee scrolling */}
+      <style>{`
+        @keyframes scrollLeft {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        @keyframes scrollRight {
+          0% { transform: translateX(-50%); }
+          100% { transform: translateX(0); }
+        }
+        .animate-scroll-left {
+          display: flex;
+          width: max-content;
+          animation: scrollLeft 35s linear infinite;
+        }
+        .animate-scroll-right {
+          display: flex;
+          width: max-content;
+          animation: scrollRight 35s linear infinite;
+        }
+        .animate-scroll-left:hover,
+        .animate-scroll-right:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
+      {/* Decorative Blur Glow background */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute top-[25%] left-[-10%] w-[350px] h-[350px] bg-emerald-600/3 rounded-full blur-[110px]" />
+        <div className="absolute bottom-[25%] right-[-10%] w-[350px] h-[350px] bg-green-500/3 rounded-full blur-[110px]" />
+      </div>
+
+      <div className="relative z-10 w-full">
+        {/* Centered Header */}
+        <div className="text-center mb-12 px-4 max-w-3xl mx-auto">
+          {/* Badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="inline-block px-4 py-2 rounded-full bg-yellow-100 text-yellow-700 text-sm font-semibold mb-4"
+            transition={{ duration: 0.6 }}
+            className="inline-flex items-center px-4 py-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/5 text-emerald-400 text-xs font-bold mb-5"
           >
-            Trusted by Teachers
-          </motion.span>
-          <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-            Loved by Educators Everywhere
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Join thousands of teachers who are saving time and improving student outcomes
-          </p>
-        </motion.div>
+            <HeartIcon /> User Stories
+          </motion.div>
 
-        {/* Testimonials Carousel */}
-        <div className="max-w-4xl mx-auto mb-12">
-          <AnimatePresence mode="wait">
-            <div key={activeIndex} className="mb-8">
-              <TestimonialCard
-                {...testimonials[activeIndex]}
-                isActive={true}
-              />
-            </div>
-          </AnimatePresence>
+          {/* Headline */}
+          <motion.h2
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="font-space text-4xl sm:text-5xl font-bold text-white leading-tight mb-4"
+          >
+            Real impact in <span className="text-[#82e23e]">classrooms.</span>
+          </motion.h2>
 
-          {/* Navigation */}
-          <div className="flex items-center justify-between">
-            {/* Dots */}
-            <div className="flex gap-2 flex-1">
-              {testimonials.map((_, index) => (
-                <motion.button
-                  key={index}
-                  onClick={() => setActiveIndex(index)}
-                  whileHover={{ scale: 1.2 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`h-2 rounded-full transition-colors ${
-                    index === activeIndex ? 'bg-indigo-600 w-8' : 'bg-gray-300 w-2'
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* Arrow Buttons */}
-            <div className="flex gap-4 ml-6">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={prevSlide}
-                className="p-3 rounded-full bg-gray-100 hover:bg-indigo-100 text-gray-700 hover:text-indigo-600 transition-colors"
-              >
-                <HiChevronLeft size={24} />
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={nextSlide}
-                className="p-3 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
-              >
-                <HiChevronRight size={24} />
-              </motion.button>
-            </div>
-          </div>
+          {/* Subtitle */}
+          <motion.p
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-gray-400 text-sm sm:text-base leading-relaxed max-w-xl mx-auto"
+          >
+            See how Acharya AI is helping teachers across India reclaim their weekends and spark joy in learning.
+          </motion.p>
         </div>
 
-        {/* Stats */}
+        {/* Center Horizontal Metric Card */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="border-t border-gray-200 pt-12 grid grid-cols-3 gap-8 text-center"
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="relative max-w-sm sm:max-w-md mx-auto rounded-2xl border border-white/[0.06] bg-[#0d1015]/90 px-5 py-4 flex items-center gap-4 overflow-hidden shadow-xl mb-16 mx-4"
         >
-          {[
-            { label: '4.9★', desc: 'Average Rating' },
-            { label: '1,000+', desc: 'Reviews' },
-            { label: '98%', desc: 'Satisfaction' },
-          ].map((stat, i) => (
-            <div key={i}>
-              <p className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                {stat.label}
-              </p>
-              <p className="text-gray-600 text-sm mt-1">{stat.desc}</p>
+          {/* Watermark Clock */}
+          <div className="absolute -right-2 -bottom-2 w-20 h-20 pointer-events-none select-none">
+            <WatermarkClock />
+          </div>
+          {/* Clock Icon container */}
+          <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shrink-0">
+            <ClockIcon />
+          </div>
+          <div>
+            <div className="font-space text-xl sm:text-2xl font-bold text-white leading-tight">
+              10,000+ Hours Saved
             </div>
-          ))}
+            <p className="text-gray-400 text-xs font-semibold">
+              Monthly classroom time reclaimed by educators
+            </p>
+          </div>
         </motion.div>
+
+        {/* Horizontal Marquee Container */}
+        <div className="relative w-full overflow-hidden flex flex-col gap-6 py-4">
+          
+          {/* Left fading edge mask */}
+          <div className="absolute top-0 bottom-0 left-0 w-16 sm:w-36 bg-gradient-to-r from-black to-transparent pointer-events-none z-20" />
+          {/* Right fading edge mask */}
+          <div className="absolute top-0 bottom-0 right-0 w-16 sm:w-36 bg-gradient-to-l from-black to-transparent pointer-events-none z-20" />
+
+          {/* Row 1: Scrolling Left */}
+          <div className="overflow-hidden flex w-full">
+            <div className="animate-scroll-left gap-6 px-3">
+              {doubleRow1.map((item, idx) => (
+                <TestimonialCard key={`row1-${idx}`} item={item} />
+              ))}
+            </div>
+          </div>
+
+          {/* Row 2: Scrolling Right */}
+          <div className="overflow-hidden flex w-full">
+            <div className="animate-scroll-right gap-6 px-3">
+              {doubleRow2.map((item, idx) => (
+                <TestimonialCard key={`row2-${idx}`} item={item} />
+              ))}
+            </div>
+          </div>
+
+        </div>
       </div>
     </section>
   );

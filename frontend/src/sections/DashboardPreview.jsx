@@ -1,283 +1,218 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { HiArrowRight } from 'react-icons/hi';
+import { 
+  HiBookOpen, 
+  HiFolder, 
+  HiAcademicCap, 
+  HiDocumentText, 
+  HiPhotograph,
+  HiCalculator,
+  HiChevronRight
+} from 'react-icons/hi';
+import { HiSquares2X2 } from 'react-icons/hi2';
 
 export default function DashboardPreview() {
   const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.15,
-        delayChildren: 0.2,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 40 },
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.8 },
+      transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] },
     },
   };
 
-  return (
-    <section className="section-padding bg-gradient-to-b from-indigo-50 via-white to-white">
-      <div className="container-custom">
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="mb-16 text-center"
-        >
-          <motion.span
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="inline-block px-4 py-2 rounded-full bg-purple-100 text-purple-700 text-sm font-semibold mb-4"
-          >
-            Dashboard Preview
-          </motion.span>
-          <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-            Intuitive Dashboard Built for Teachers
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Access all your teaching tools in one unified, beautifully designed interface
-          </p>
-        </motion.div>
+  const sidebarItems = [
+    { label: 'Dashboard', icon: HiSquares2X2, active: true },
+    { label: 'My Library', icon: HiFolder },
+    { label: 'My Workspace', icon: HiAcademicCap },
+    { label: 'Lesson Planner', icon: HiDocumentText },
+    { label: 'Paper Explorer', icon: HiDocumentText },
+    { label: 'Visual Aids', icon: HiPhotograph },
+    { label: 'Math Solver', icon: HiCalculator },
+  ];
 
-        {/* Main Dashboard Preview */}
+  const quickTools = [
+    {
+      title: 'Lesson Planner',
+      desc: 'Create engaging lesson plans tailored to your curriculum.',
+      icon: HiDocumentText,
+      action: 'Launch'
+    },
+    {
+      title: 'Visual Aids',
+      desc: 'Generate custom visual aids to explain complex topics.',
+      icon: HiPhotograph,
+      action: 'Launch'
+    },
+    {
+      title: 'Math Solver',
+      desc: 'Solve complex math problems step-by-step.',
+      icon: HiCalculator,
+      action: 'Launch'
+    },
+    {
+      title: 'Paper Explorer',
+      desc: 'Generate test papers, worksheets, and exams instantly.',
+      icon: HiBookOpen,
+      action: 'Launch'
+    }
+  ];
+
+  return (
+    <section className="relative pb-24 px-4 overflow-hidden bg-[#030712] flex flex-col items-center">
+      {/* Glow effects */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute bottom-[10%] left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-emerald-600/10 rounded-full blur-[120px] opacity-50" />
+      </div>
+
+      <div className="container-custom relative z-10 w-full max-w-5xl">
         <motion.div
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: '-100px' }}
-          className="relative pb-8 lg:pb-0"
+          className="w-full"
         >
-          {/* Dashboard Container */}
-          <motion.div
-            variants={itemVariants}
-            className="relative rounded-3xl border border-gray-200 bg-white shadow-2xl overflow-hidden"
-          >
-            {/* Top Bar */}
-            <div className="bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 h-16 flex items-center px-8 gap-4">
+          {/* Main Dashboard Box */}
+          <div className="rounded-3xl border border-white/[0.08] bg-[#0b101d]/40 backdrop-blur-md p-2 shadow-2xl relative shadow-emerald-950/20">
+            
+            {/* Outer window bar */}
+            <div className="absolute top-0 left-0 right-0 h-10 bg-white/[0.02] border-b border-white/[0.05] rounded-t-3xl flex items-center px-6">
               <div className="flex gap-2">
-                <div className="w-4 h-4 rounded-full bg-red-400"></div>
-                <div className="w-4 h-4 rounded-full bg-yellow-400"></div>
-                <div className="w-4 h-4 rounded-full bg-green-400"></div>
+                <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                <div className="w-3 h-3 rounded-full bg-green-500/80" />
               </div>
-              <span className="text-white text-sm font-medium ml-auto">
-                TeacherHub Dashboard
+              <span className="mx-auto text-[11px] text-gray-500 font-medium tracking-wide">
+                acharya.ai/dashboard
               </span>
             </div>
 
-            {/* Dashboard Content */}
-            <div className="grid grid-cols-12 gap-0 min-h-[600px]">
-              {/* Sidebar */}
-              <motion.div
-                variants={itemVariants}
-                className="col-span-12 md:col-span-3 bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 p-6"
-              >
-                <div className="space-y-6">
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                      Menu
-                    </p>
-                    {['Dashboard', 'Attendance', 'Grades', 'Lessons', 'Students'].map(
-                      (item, i) => (
-                        <motion.div
-                          key={i}
-                          whileHover={{ x: 4 }}
-                          className={`py-2 px-3 rounded-lg mb-2 cursor-pointer transition-colors ${
-                            i === 0
-                              ? 'bg-indigo-100 text-indigo-700 font-semibold'
-                              : 'text-gray-600 hover:bg-gray-100'
-                          }`}
-                        >
-                          {item}
-                        </motion.div>
-                      )
-                    )}
+            {/* Dashboard Container (Light mode theme wrapper inside dark portal) */}
+            <div className="bg-white rounded-2xl overflow-hidden mt-8 shadow-inner flex flex-col text-gray-800 font-sans">
+              
+              {/* Grid content */}
+              <div className="grid grid-cols-12 min-h-[580px]">
+                
+                {/* Sidebar */}
+                <div className="col-span-12 md:col-span-3 border-r border-gray-100 p-5 bg-gray-50/50 flex flex-col gap-1">
+                  {/* Sidebar Logo */}
+                  <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
+                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shadow-md">
+                      <HiBookOpen className="text-white" size={16} />
+                    </div>
+                    <span className="font-bold text-sm text-gray-900 tracking-tight flex items-center gap-1">
+                      Acharya <span className="text-emerald-600">AI</span>
+                    </span>
                   </div>
-                </div>
-              </motion.div>
 
-              {/* Main Content */}
-              <motion.div
-                variants={itemVariants}
-                className="col-span-12 md:col-span-9 p-8 space-y-6"
-              >
-                {/* Header */}
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900">Welcome, Mrs. Johnson</h3>
-                  <p className="text-gray-600 text-sm mt-1">
-                    Last updated 2 hours ago
-                  </p>
+                  {sidebarItems.map((item, idx) => {
+                    const Icon = item.icon;
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs font-semibold cursor-pointer transition-all duration-200 ${
+                          item.active
+                            ? 'bg-emerald-50 text-emerald-600 border-l-[3px] border-emerald-600 rounded-l-none'
+                            : 'text-gray-500 hover:bg-gray-100/70 hover:text-gray-900'
+                        }`}
+                      >
+                        <Icon size={16} className={item.active ? 'text-emerald-600' : 'text-gray-400'} />
+                        {item.label}
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[
-                    { label: 'Active Classes', value: '5', icon: '📚' },
-                    { label: 'Total Students', value: '142', icon: '👥' },
-                    { label: 'Avg Attendance', value: '96%', icon: '✓' },
-                    { label: 'Pending Grades', value: '23', icon: '📊' },
-                  ].map((stat, i) => (
-                    <motion.div
-                      key={i}
-                      whileHover={{ y: -5 }}
-                      className="rounded-xl bg-gradient-to-br from-gray-50 to-white p-4 border border-gray-200"
-                    >
-                      <div className="text-2xl mb-2">{stat.icon}</div>
-                      <p className="text-sm text-gray-600">{stat.label}</p>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">
-                        {stat.value}
+                {/* Main panel */}
+                <div className="col-span-12 md:col-span-9 p-6 sm:p-8 bg-white flex flex-col gap-6 text-left">
+                  
+                  {/* Greeting */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
+                        Good morning, Teachers
+                      </h2>
+                      <p className="text-xs sm:text-sm text-gray-400 font-medium mt-1">
+                        Ready to create something amazing? Your AI assistant is here to help.
                       </p>
-                    </motion.div>
-                  ))}
-                </div>
+                    </div>
+                    
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700 shadow-sm">
+                      S
+                    </div>
+                  </div>
 
-                {/* Charts Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Chart 1 */}
-                  <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-white p-6 border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-4">
-                      Attendance Rate
-                    </h4>
-                    <div className="flex items-end gap-1 h-32">
-                      {[65, 72, 68, 85, 92, 88, 96].map((height, i) => (
-                        <motion.div
-                          key={i}
-                          initial={{ height: 0 }}
-                          whileInView={{ height: `${height}%` }}
-                          viewport={{ once: true }}
-                          transition={{ duration: 0.8, delay: i * 0.1 }}
-                          className="flex-1 bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-lg"
-                        ></motion.div>
+                  {/* Summary Card */}
+                  <div className="border border-gray-100 rounded-xl p-5 flex flex-col gap-4 shadow-sm bg-white">
+                    <div>
+                      <h3 className="text-xs font-bold text-gray-800 tracking-wide uppercase">
+                        Your Weekly Summary
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Great progress! Keep up the good work.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4 pt-2">
+                      {[
+                        { label: 'TOTAL TOPICS', value: '0' },
+                        { label: 'TOTAL ASSETS CREATED', value: '25' },
+                        { label: 'ASSETS THIS WEEK', value: '0' },
+                      ].map((stat, i) => (
+                        <div key={i} className="border border-gray-100 rounded-lg p-4 flex flex-col gap-1 bg-gray-50/30">
+                          <span className="text-[9px] font-bold text-gray-400 tracking-wider">
+                            {stat.label}
+                          </span>
+                          <span className="text-2xl font-extrabold text-gray-900">
+                            {stat.value}
+                          </span>
+                          <div className="w-full h-1 bg-gray-100 rounded-full mt-2 overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500 rounded-full"
+                              style={{ width: stat.value === '25' ? '40%' : '0%' }}
+                            />
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Chart 2 */}
-                  <div className="rounded-xl bg-gradient-to-br from-purple-50 to-white p-6 border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-4">
-                      Grade Distribution
-                    </h4>
-                    <div className="space-y-3">
-                      {['A', 'B', 'C', 'D'].map((grade, i) => {
-                        const widths = [45, 30, 20, 5];
-                        return (
-                          <div key={i}>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span className="font-semibold text-gray-900">
-                                Grade {grade}
-                              </span>
-                              <span className="text-gray-600">{widths[i]}%</span>
+                  {/* Quick Action Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
+                    {quickTools.map((tool, index) => {
+                      const ToolIcon = tool.icon;
+                      return (
+                        <div 
+                          key={index}
+                          className="border border-gray-100 hover:border-emerald-200 rounded-xl p-4 flex flex-col justify-between bg-white shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                        >
+                          <div>
+                            <div className="w-7 h-7 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-500 mb-3 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
+                              <ToolIcon size={14} />
                             </div>
-                            <motion.div
-                              initial={{ width: 0 }}
-                              whileInView={{ width: `${widths[i]}%` }}
-                              viewport={{ once: true }}
-                              transition={{ duration: 0.8, delay: i * 0.1 }}
-                              className="h-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full"
-                            ></motion.div>
+                            <h4 className="text-xs font-bold text-gray-800 mb-1 group-hover:text-emerald-600 transition-colors">
+                              {tool.title}
+                            </h4>
+                            <p className="text-[10px] text-gray-400 leading-normal font-medium">
+                              {tool.desc}
+                            </p>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
 
-                {/* Quick Actions */}
-                <div className="pt-4 border-t border-gray-200 flex flex-wrap gap-3">
-                  <button className="button-primary text-sm py-2 px-4">
-                    Record Attendance
-                  </button>
-                  <button className="button-secondary text-sm py-2 px-4">
-                    Add Grades
-                  </button>
-                  <button className="button-secondary text-sm py-2 px-4">
-                    Plan Lesson
-                  </button>
-                </div>
-              </motion.div>
-            </div>
+                          <div className="flex items-center justify-between text-[9px] font-bold text-gray-400 mt-4 border-t border-gray-50 pt-2 group-hover:text-emerald-500 transition-colors">
+                            <span>{tool.action}</span>
+                            <HiChevronRight size={10} className="transform group-hover:translate-x-0.5 transition-transform" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
 
-            {/* Notifications card — inside dashboard bounds */}
-            <motion.div
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 4, repeat: Infinity }}
-              className="absolute bottom-4 right-4 z-10 hidden lg:block max-w-[16rem]"
-            >
-              <div className="glass-effect backdrop-blur-xl p-5 rounded-2xl shadow-2xl">
-                <p className="text-sm font-semibold text-gray-900 mb-2">
-                  Real-time Notifications
-                </p>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-start gap-2">
-                    <span className="text-lg">🔔</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Class Ended</p>
-                      <p className="text-xs text-gray-600">2 min ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2 pt-2 border-t border-gray-200/80">
-                    <span className="text-lg">📝</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Assignment Due</p>
-                      <p className="text-xs text-gray-600">Today at 5 PM</p>
-                    </div>
-                  </div>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
 
-          {/* Mobile / tablet: notifications below dashboard */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mt-6 lg:hidden"
-          >
-            <div className="glass-effect p-5 rounded-2xl shadow-lg max-w-md mx-auto">
-              <p className="text-sm font-semibold text-gray-900 mb-2">
-                Real-time Notifications
-              </p>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-start gap-2">
-                  <span className="text-lg">🔔</span>
-                  <div>
-                    <p className="font-medium text-gray-900">Class Ended</p>
-                    <p className="text-xs text-gray-600">2 min ago</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 pt-2 border-t border-gray-200">
-                  <span className="text-lg">📝</span>
-                  <div>
-                    <p className="font-medium text-gray-900">Assignment Due</p>
-                    <p className="text-xs text-gray-600">Today at 5 PM</p>
-                  </div>
-                </div>
-              </div>
             </div>
-          </motion.div>
-        </motion.div>
-
-        {/* CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.5 }}
-          className="mt-16 text-center"
-        >
-          <button className="button-primary inline-flex items-center gap-2 group">
-            Explore Full Dashboard
-            <HiArrowRight className="group-hover:translate-x-1 transition-transform" />
-          </button>
+          </div>
         </motion.div>
       </div>
     </section>
