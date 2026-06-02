@@ -1,0 +1,10 @@
+import express from 'express';
+import { gradeHomework } from '../controllers/graderController.js';
+import { protect, authorize } from '../middleware/authMiddleware.js';
+import { upload } from '../middleware/uploadMiddleware.js';
+
+const router = express.Router();
+
+router.post('/grade', protect, authorize('Teacher'), upload.single('file'), gradeHomework);
+
+export default router;
