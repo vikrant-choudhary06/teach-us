@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   HiArrowLeft,
@@ -27,8 +27,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [focusedField, setFocusedField] = useState(null)
+  const navigate = useNavigate()
 
-  const handleSubmit = (e) => e.preventDefault()
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const emailVal = e.target.email.value || 'educator@acharya.ai'
+    localStorage.setItem('userEmail', emailVal)
+    navigate('/dashboard')
+  }
 
   return (
     <div className="min-h-screen w-full flex overflow-hidden bg-[#020604]">
@@ -71,7 +77,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/30">
               <HiBookOpen className="text-white" size={20} />
             </div>
-            <span className="text-xl font-bold tracking-tight text-white">
+            <span className="text-xl font-bold tracking-tight text-white font-space">
               Acharya <span className="text-emerald-400">AI</span>
             </span>
           </div>
@@ -82,7 +88,7 @@ export default function LoginPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.6 }}
-              className="text-4xl xl:text-5xl font-black leading-[1.1] text-white tracking-tight"
+              className="text-4xl xl:text-5xl font-black leading-[1.1] text-white tracking-tight font-space"
             >
               Welcome back,<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-300">
@@ -163,7 +169,7 @@ export default function LoginPage() {
           </div>
 
           {/* Heading */}
-          <h2 className="text-3xl font-black text-white tracking-tight">Sign in</h2>
+          <h2 className="text-3xl font-black text-white tracking-tight font-space">Sign in</h2>
           <p className="mt-2 text-sm text-gray-500">
             No account?{' '}
             <a href="#" className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">

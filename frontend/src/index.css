@@ -124,21 +124,79 @@
   animation-delay: 4s;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
+/* Standard Scrollbar styling for Firefox (hides arrows, styles green line) */
+@supports not (-webkit-appearance: none) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #10b981 transparent;
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: #000000;
+/* Chrome, Edge, Safari Webkit scrollbars (Thin green line, NO arrows) */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  display: block !important;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #111827;
-  border-radius: 4px;
+*::-webkit-scrollbar-track {
+  background: transparent !important;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #10b981;
+*::-webkit-scrollbar-thumb {
+  background: #10b981 !important;
+  border-radius: 10px !important;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #34d399 !important;
+}
+
+*::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
+}
+
+/* Sidebar & Main Scrollbar (Thin green line, NO arrows, always visible) */
+.custom-sidebar-scroll {
+  overflow-y: auto;
+}
+
+@supports not (-webkit-appearance: none) {
+  .custom-sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #10b981 transparent;
+  }
+}
+
+.custom-sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+  display: block !important;
+}
+
+.custom-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.custom-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #10b981 !important;
+  border-radius: 10px !important;
+}
+
+.custom-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #34d399 !important;
+}
+
+/* Scrollbar none utility */
+.scrollbar-none {
+  scrollbar-width: none !important;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
 }
 
 button:focus-visible,
