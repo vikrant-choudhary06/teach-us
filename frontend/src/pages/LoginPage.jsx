@@ -12,6 +12,9 @@ import {
 } from 'react-icons/hi'
 import { GoogleLogin } from '@react-oauth/google'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+
+
 const stats = [
   { value: '50K+', label: 'Active Teachers' },
   { value: '2M+', label: 'Students Tracked' },
@@ -47,7 +50,7 @@ export default function LoginPage() {
     const payload = isSignUp ? { name, email, password, role } : { email, password }
 
     try {
-      const res = await fetch(`http://localhost:5000${endpoint}`, {
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -74,7 +77,7 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/google', {
+      const res = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: credential, role: 'Teacher' }),
