@@ -8,8 +8,9 @@ import {
   HiEye,
   HiEyeOff,
   HiBookOpen,
+  HiUser,
 } from 'react-icons/hi'
-import { FaGoogle } from 'react-icons/fa'
+import { GoogleLogin } from '@react-oauth/google'
 
 const stats = [
   { value: '50K+', label: 'Active Teachers' },
@@ -27,13 +28,72 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [focusedField, setFocusedField] = useState(null)
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    const emailVal = e.target.email.value || 'educator@acharya.ai'
-    localStorage.setItem('userEmail', emailVal)
-    navigate('/dashboard')
+    setError('')
+    setLoading(true)
+
+    const name = e.target.name?.value
+    const email = e.target.email.value
+    const password = e.target.password.value
+    const role = e.target.role?.value || 'Teacher'
+
+    const endpoint = isSignUp ? '/api/auth/register' : '/api/auth/login'
+    const payload = isSignUp ? { name, email, password, role } : { email, password }
+
+    try {
+      const res = await fetch(`http://localhost:5000${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Something went wrong')
+      }
+
+      localStorage.setItem('userEmail', data.email)
+      localStorage.setItem('userInfo', JSON.stringify(data))
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleSuccess = async (credential) => {
+    setError('')
+    setLoading(true)
+
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: credential, role: 'Teacher' }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Google Authentication failed')
+      }
+
+      localStorage.setItem('userEmail', data.email)
+      localStorage.setItem('userInfo', JSON.stringify(data))
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -169,22 +229,38 @@ export default function LoginPage() {
           </div>
 
           {/* Heading */}
-          <h2 className="text-3xl font-black text-white tracking-tight font-space">Sign in</h2>
+          <h2 className="text-3xl font-black text-white tracking-tight font-space">
+            {isSignUp ? 'Create account' : 'Sign in'}
+          </h2>
           <p className="mt-2 text-sm text-gray-500">
-            No account?{' '}
-            <a href="#" className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">
-              Start free trial →
-            </a>
+            {isSignUp ? 'Already have an account? ' : 'No account? '}
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp)
+                setError('')
+              }}
+              className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors bg-transparent border-none p-0 cursor-pointer align-baseline"
+            >
+              {isSignUp ? 'Sign in →' : 'Start free trial →'}
+            </button>
           </p>
 
           {/* Google button */}
-          <button
-            type="button"
-            className="mt-8 flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/20 px-4 py-3 text-sm font-semibold text-white transition-all duration-200 active:scale-[0.98]"
-          >
-            <FaGoogle className="text-red-400" size={16} />
-            Continue with Google
-          </button>
+          <div className="mt-8 flex w-full justify-center">
+            <GoogleLogin
+              onSuccess={(credentialResponse) => {
+                handleGoogleSuccess(credentialResponse.credential)
+              }}
+              onError={() => {
+                setError('Google authentication failed')
+              }}
+              theme="dark"
+              shape="pill"
+              size="large"
+              width="384px"
+            />
+          </div>
 
           {/* Divider */}
           <div className="relative my-7 flex items-center">
@@ -195,6 +271,37 @@ export default function LoginPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+
+            {error && (
+              <div className="p-3.5 rounded-xl border border-red-500/20 bg-red-500/10 text-xs font-semibold text-red-400 leading-relaxed">
+                {error}
+              </div>
+            )}
+
+            {isSignUp && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-2"
+              >
+                <label htmlFor="name" className="block text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+                  Full Name
+                </label>
+                <div className={`relative flex items-center rounded-xl border transition-all duration-200 ${focusedField === 'name' ? 'border-emerald-500/60 bg-emerald-500/[0.04] shadow-[0_0_0_3px_rgba(52,211,153,0.08)]' : 'border-white/[0.08] bg-white/[0.02]'}`}>
+                  <HiUser className="pointer-events-none absolute left-3.5 text-gray-600" size={17} />
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    required={isSignUp}
+                    placeholder="John Doe"
+                    onFocus={() => setFocusedField('name')}
+                    onBlur={() => setFocusedField(null)}
+                    className="w-full bg-transparent py-3 pl-11 pr-4 text-sm text-white placeholder-gray-600 focus:outline-none"
+                  />
+                </div>
+              </motion.div>
+            )}
 
             {/* Email */}
             <div>
@@ -251,6 +358,30 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {isSignUp && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-2"
+              >
+                <label htmlFor="role" className="block text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+                  Role
+                </label>
+                <div className="relative flex items-center rounded-xl border border-white/[0.08] bg-[#020604]">
+                  <select
+                    id="role"
+                    name="role"
+                    defaultValue="Teacher"
+                    className="w-full bg-[#020604] py-3.5 px-4 rounded-xl text-sm text-white focus:outline-none border-none cursor-pointer"
+                  >
+                    <option value="Teacher">Teacher</option>
+                    <option value="Student">Student</option>
+                    <option value="Parent">Parent</option>
+                  </select>
+                </div>
+              </motion.div>
+            )}
+
             {/* Remember me */}
             <label className="flex cursor-pointer items-center gap-2.5 select-none pt-1">
               <div
@@ -269,11 +400,12 @@ export default function LoginPage() {
             {/* Submit */}
             <motion.button
               type="submit"
+              disabled={loading}
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
-              className="mt-2 w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 text-black font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-200"
+              className={`mt-2 w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 text-black font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              Sign in to Acharya AI
+              {loading ? 'Processing...' : isSignUp ? 'Sign up to Acharya AI' : 'Sign in to Acharya AI'}
             </motion.button>
           </form>
 

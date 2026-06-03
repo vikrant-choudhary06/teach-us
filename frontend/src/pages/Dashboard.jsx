@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [userEmail, setUserEmail] = useState('educator@acharya.ai')
+  const [userName, setUserName] = useState('Educator')
   const [isAIChatOpen, setIsAIChatOpen] = useState(false)
   const [credits, setCredits] = useState(30)
   const navigate = useNavigate()
@@ -43,10 +44,22 @@ export default function Dashboard() {
     if (savedEmail) {
       setUserEmail(savedEmail)
     }
+    const savedInfo = localStorage.getItem('userInfo')
+    if (savedInfo) {
+      try {
+        const info = JSON.parse(savedInfo)
+        if (info.name) {
+          setUserName(info.name)
+        }
+      } catch (e) {
+        console.error('Error parsing userInfo:', e)
+      }
+    }
   }, [])
 
   const handleLogout = () => {
     localStorage.removeItem('userEmail')
+    localStorage.removeItem('userInfo')
     navigate('/login')
   }
 
@@ -67,7 +80,7 @@ export default function Dashboard() {
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
-        return <OverviewTab setActiveTab={setActiveTab} menuItems={menuItems} userEmail={userEmail} />
+        return <OverviewTab setActiveTab={setActiveTab} menuItems={menuItems} userEmail={userEmail} userName={userName} />
       case 'flight-deck':
         return <LiveFlightDeck digitizedResult={digitizedResult} setActiveTab={setActiveTab} />
       case 'digitizer':
@@ -203,10 +216,10 @@ export default function Dashboard() {
             <div className="flex items-center justify-between bg-white/[0.03] border border-white/[0.06] p-3 rounded-xl">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center font-black text-emerald-400 text-sm shrink-0 uppercase">
-                  {userEmail.substring(0, 2)}
+                  {(userName || userEmail).substring(0, 2)}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-black text-white truncate leading-none">{userEmail.split('@')[0]}</p>
+                  <p className="text-xs sm:text-sm font-black text-white truncate leading-none">{userName}</p>
                   <p className="text-xs text-gray-400 truncate mt-1.5 leading-none font-medium">{userEmail}</p>
                 </div>
               </div>
@@ -306,10 +319,10 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-lg border border-white/10">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center font-black text-emerald-400 text-sm">
-                        {userEmail.substring(0, 2).toUpperCase()}
+                        {(userName || userEmail).substring(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0 text-left">
-                        <p className="text-sm font-black text-white truncate">{userEmail.split('@')[0]}</p>
+                        <p className="text-sm font-black text-white truncate">{userName}</p>
                       </div>
                     </div>
                     <button onClick={handleLogout} className="text-gray-400 hover:text-red-400">
@@ -410,7 +423,7 @@ export default function Dashboard() {
 }
 
 /* ── SPATIAL OVERVIEW TAB ── */
-function OverviewTab({ setActiveTab, menuItems, userEmail }) {
+function OverviewTab({ setActiveTab, menuItems, userEmail, userName }) {
   const gridFeatures = menuItems.filter(
     (item) => item.id !== 'overview' && item.id !== 'library' && item.id !== 'workspace'
   )
@@ -430,7 +443,7 @@ function OverviewTab({ setActiveTab, menuItems, userEmail }) {
       {/* Title block */}
       <div>
         <h2 className="text-2xl md:text-3xl font-black font-space tracking-tight text-white leading-none">
-          Welcome Back, <span className="text-emerald-400 font-bold">{userEmail}</span>
+          Welcome Back, <span className="text-emerald-400 font-bold">{userName || userEmail}</span>
         </h2>
         <p className="text-gray-300 text-sm sm:text-base mt-2.5 font-semibold">
           Ready to create something amazing? Select a tool below to begin.
