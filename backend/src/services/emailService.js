@@ -172,3 +172,48 @@ export const sendWeeklyParentReport = async (parentEmail, parentName, reportData
     throw error;
   }
 };
+
+export const sendVerificationOTP = async (email, name, otp) => {
+  const transporter = createTransporter();
+
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #fcfcfc;">
+      <div style="text-align: center; border-bottom: 2px solid #10b981; padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="color: #10b981; margin: 0;">Acharya AI Verification</h2>
+        <p style="color: #6b7280; font-size: 14px; margin: 5px 0 0 0;">Verify your educator account</p>
+      </div>
+
+      <p>Hello ${name || 'User'},</p>
+      <p>Thank you for registering with <strong>Acharya AI</strong>. Please use the following One-Time Password (OTP) to complete your registration. This OTP is valid for 10 minutes:</p>
+      
+      <div style="text-align: center; margin: 30px 0;">
+        <span style="font-size: 32px; font-weight: 900; letter-spacing: 6px; color: #10b981; background-color: #f0fdf4; padding: 12px 24px; border-radius: 8px; border: 1px dashed #10b981; display: inline-block;">
+          ${otp}
+        </span>
+      </div>
+
+      <p>If you did not request this verification code, please ignore this email.</p>
+      
+      <p style="margin-top: 25px; font-size: 11px; color: #9ca3af; text-align: center; border-top: 1px solid #f3f4f6; padding-top: 15px;">
+        Acharya AI Ecosystem - Modern tools for modern classrooms.
+      </p>
+    </div>
+  `;
+
+  const mailOptions = {
+    from: `"Acharya AI" <${process.env.EMAIL_USER || 'classos@school.edu'}>`,
+    to: email,
+    subject: `Acharya AI: Verify Your Account (OTP: ${otp})`,
+    html: htmlContent,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Verification OTP email sent successfully to ${email}. Info ID: ${info.messageId}`);
+    return info;
+  } catch (error) {
+    console.error(`Error sending verification OTP email to ${email}:`, error);
+    throw error;
+  }
+};
+

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -34,7 +34,22 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showOTPVerification, setShowOTPVerification] = useState(false)
+  const [verificationEmail, setVerificationEmail] = useState('')
+  const [otp, setOtp] = useState(['', '', '', '', '', ''])
+  const [otpTimer, setOtpTimer] = useState(60)
+  const [isResending, setIsResending] = useState(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    let interval;
+    if (showOTPVerification && otpTimer > 0) {
+      interval = setInterval(() => {
+        setOtpTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [showOTPVerification, otpTimer]);
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -69,9 +84,16 @@ export default function LoginPage() {
         throw new Error(data.message || 'Something went wrong')
       }
 
-      localStorage.setItem('userEmail', data.email)
-      localStorage.setItem('userInfo', JSON.stringify(data))
-      navigate('/dashboard')
+      if (isSignUp || data.status === 'UNVERIFIED') {
+        setVerificationEmail(email)
+        setShowOTPVerification(true)
+        setOtpTimer(60)
+        setOtp(['', '', '', '', '', ''])
+      } else {
+        localStorage.setItem('userEmail', data.email)
+        localStorage.setItem('userInfo', JSON.stringify(data))
+        navigate('/dashboard')
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -105,6 +127,95 @@ export default function LoginPage() {
       setLoading(false)
     }
   }
+
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    const otpCode = otp.join('');
+    if (otpCode.length !== 6) {
+      setError('Please enter all 6 digits of the verification code.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: verificationEmail, otp: otpCode }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Verification failed');
+      }
+
+      localStorage.setItem('userEmail', data.email);
+      localStorage.setItem('userInfo', JSON.stringify(data));
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    setError('');
+    setIsResending(true);
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/resend-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: verificationEmail }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to resend code');
+      }
+
+      setOtpTimer(60);
+      setOtp(['', '', '', '', '', '']);
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  const handleOtpChange = (value, index) => {
+    if (isNaN(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value.substring(value.length - 1);
+    setOtp(newOtp);
+
+    // Focus next box
+    if (value !== '' && index < 5) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (e, index) => {
+    if (e.key === 'Backspace') {
+      if (otp[index] === '' && index > 0) {
+        const prevInput = document.getElementById(`otp-${index - 1}`);
+        if (prevInput) {
+          prevInput.focus();
+          const newOtp = [...otp];
+          newOtp[index - 1] = '';
+          setOtp(newOtp);
+        }
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen w-full flex overflow-hidden bg-[#020604]">
@@ -238,196 +349,278 @@ export default function LoginPage() {
             <span className="text-lg font-bold text-white">Acharya <span className="text-emerald-400">AI</span></span>
           </div>
 
-          {/* Heading */}
-          <h2 className="text-3xl font-black text-white tracking-tight font-space">
-            {isSignUp ? 'Create account' : 'Sign in'}
-          </h2>
-          <p className="mt-2 text-sm text-gray-500">
-            {isSignUp ? 'Already have an account? ' : 'No account? '}
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp)
-                setError('')
-              }}
-              className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors bg-transparent border-none p-0 cursor-pointer align-baseline"
+          {showOTPVerification ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="space-y-6"
             >
-              {isSignUp ? 'Sign in →' : 'Start free trial →'}
-            </button>
-          </p>
-
-          {/* Google button */}
-          <div className="mt-8 flex w-full justify-center">
-            <GoogleLogin
-              onSuccess={(credentialResponse) => {
-                handleGoogleSuccess(credentialResponse.credential)
-              }}
-              onError={() => {
-                setError('Google authentication failed')
-              }}
-              theme="dark"
-              shape="pill"
-              size="large"
-              width="384px"
-            />
-          </div>
-
-          {/* Divider */}
-          <div className="relative my-7 flex items-center">
-            <div className="flex-1 border-t border-white/[0.07]" />
-            <span className="mx-4 text-[11px] font-medium text-gray-600 uppercase tracking-widest">or</span>
-            <div className="flex-1 border-t border-white/[0.07]" />
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-
-            {error && (
-              <div className="p-3.5 rounded-xl border border-red-500/20 bg-red-500/10 text-xs font-semibold text-red-400 leading-relaxed">
-                {error}
+              <div>
+                <h2 className="text-3xl font-black text-white tracking-tight font-space">
+                  Verify email
+                </h2>
+                <p className="mt-2.5 text-sm text-gray-400 leading-relaxed">
+                  We sent a 6-digit verification code to <span className="text-emerald-400 font-semibold">{verificationEmail}</span>. Enter it below to verify your account.
+                </p>
               </div>
-            )}
 
-            {isSignUp && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-2"
-              >
-                <label htmlFor="name" className="block text-[11px] font-semibold uppercase tracking-widest text-gray-500">
-                  Full Name
-                </label>
-                <div className={`relative flex items-center rounded-xl border transition-all duration-200 ${focusedField === 'name' ? 'border-emerald-500/60 bg-emerald-500/[0.04] shadow-[0_0_0_3px_rgba(52,211,153,0.08)]' : 'border-white/[0.08] bg-white/[0.02]'}`}>
-                  <HiUser className="pointer-events-none absolute left-3.5 text-gray-600" size={17} />
-                  <input
-                    id="name"
-                    name="name"
-                    type="text"
-                    required={isSignUp}
-                    placeholder="John Doe"
-                    onFocus={() => setFocusedField('name')}
-                    onBlur={() => setFocusedField(null)}
-                    className="w-full bg-transparent py-3 pl-11 pr-4 text-sm text-white placeholder-gray-600 focus:outline-none"
-                  />
+              <form onSubmit={handleVerifyOTP} className="space-y-6">
+                {error && (
+                  <div className="p-3.5 rounded-xl border border-red-500/20 bg-red-500/10 text-xs font-semibold text-red-400 leading-relaxed">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex justify-between gap-2.5 my-8">
+                  {otp.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      id={`otp-${idx}`}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength="1"
+                      value={digit}
+                      onChange={(e) => handleOtpChange(e.target.value, idx)}
+                      onKeyDown={(e) => handleOtpKeyDown(e, idx)}
+                      className="w-12 h-14 text-center text-xl font-extrabold text-white bg-white/[0.03] border border-white/[0.08] focus:border-emerald-500/60 focus:bg-emerald-500/[0.04] focus:outline-none focus:ring-2 focus:ring-emerald-500/15 rounded-xl transition-all duration-200"
+                    />
+                  ))}
                 </div>
-              </motion.div>
-            )}
 
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-[11px] font-semibold uppercase tracking-widest text-gray-500 mb-2">
-                Email address
-              </label>
-              <div className={`relative flex items-center rounded-xl border transition-all duration-200 ${focusedField === 'email' ? 'border-emerald-500/60 bg-emerald-500/[0.04] shadow-[0_0_0_3px_rgba(52,211,153,0.08)]' : 'border-white/[0.08] bg-white/[0.02]'}`}>
-                <HiMail className="pointer-events-none absolute left-3.5 text-gray-600" size={17} />
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="you@school.edu"
-                  pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-                  title="Please enter a valid email address (e.g. user@example.com)"
-                  onFocus={() => setFocusedField('email')}
-                  onBlur={() => setFocusedField(null)}
-                  className="w-full bg-transparent py-3 pl-11 pr-4 text-sm text-white placeholder-gray-600 focus:outline-none"
-                />
-              </div>
-            </div>
+                <motion.button
+                  type="submit"
+                  disabled={loading}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 text-black font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {loading ? 'Verifying...' : 'Verify Code'}
+                </motion.button>
+              </form>
 
-            {/* Password */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="password" className="block text-[11px] font-semibold uppercase tracking-widest text-gray-500">
-                  Password
-                </label>
-                <a href="#" className="text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors font-medium">
-                  Forgot password?
-                </a>
-              </div>
-              <div className={`relative flex items-center rounded-xl border transition-all duration-200 ${focusedField === 'password' ? 'border-emerald-500/60 bg-emerald-500/[0.04] shadow-[0_0_0_3px_rgba(52,211,153,0.08)]' : 'border-white/[0.08] bg-white/[0.02]'}`}>
-                <HiLockClosed className="pointer-events-none absolute left-3.5 text-gray-600" size={17} />
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  required
-                  placeholder="••••••••"
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
-                  className="w-full bg-transparent py-3 pl-11 pr-11 text-sm text-white placeholder-gray-600 focus:outline-none"
-                />
+              <div className="flex flex-col items-center gap-3 pt-2 text-xs">
+                <span className="text-gray-500 font-medium">
+                  {otpTimer > 0 ? (
+                    `Resend code in ${otpTimer}s`
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendOTP}
+                      disabled={isResending}
+                      className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors bg-transparent border-none cursor-pointer p-0 disabled:opacity-50"
+                    >
+                      {isResending ? 'Resending...' : 'Resend Code'}
+                    </button>
+                  )}
+                </span>
+                
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 text-gray-600 hover:text-gray-300 transition-colors"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => {
+                    setShowOTPVerification(false);
+                    setError('');
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors bg-transparent border-none cursor-pointer p-0 font-semibold"
                 >
-                  {showPassword ? <HiEyeOff size={17} /> : <HiEye size={17} />}
+                  ← Back to login / sign up
                 </button>
               </div>
-            </div>
+            </motion.div>
+          ) : (
+            <>
+              {/* Heading */}
+              <h2 className="text-3xl font-black text-white tracking-tight font-space">
+                {isSignUp ? 'Create account' : 'Sign in'}
+              </h2>
+              <p className="mt-2 text-sm text-gray-500">
+                {isSignUp ? 'Already have an account? ' : 'No account? '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(!isSignUp)
+                    setError('')
+                  }}
+                  className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors bg-transparent border-none p-0 cursor-pointer align-baseline"
+                >
+                  {isSignUp ? 'Sign in →' : 'Start free trial →'}
+                </button>
+              </p>
 
-            {isSignUp && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-2"
-              >
-                <label htmlFor="role" className="block text-[11px] font-semibold uppercase tracking-widest text-gray-500">
-                  Role
-                </label>
-                <div className="relative flex items-center rounded-xl border border-white/[0.08] bg-[#020604]">
-                  <select
-                    id="role"
-                    name="role"
-                    defaultValue="Teacher"
-                    className="w-full bg-[#020604] py-3.5 px-4 rounded-xl text-sm text-white focus:outline-none border-none cursor-pointer"
-                  >
-                    <option value="Teacher">Teacher</option>
-                    <option value="Student">Student</option>
-                    <option value="Parent">Parent</option>
-                  </select>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Remember me */}
-            <label className="flex cursor-pointer items-center gap-2.5 select-none pt-1">
-              <div
-                onClick={() => setRememberMe(!rememberMe)}
-                className={`w-4 h-4 rounded flex items-center justify-center border transition-all duration-200 shrink-0 cursor-pointer ${rememberMe ? 'bg-emerald-500 border-emerald-500' : 'bg-white/[0.03] border-white/10'}`}
-              >
-                {rememberMe && (
-                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12">
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
+              {/* Google button */}
+              <div className="mt-8 flex w-full justify-center">
+                <GoogleLogin
+                  onSuccess={(credentialResponse) => {
+                    handleGoogleSuccess(credentialResponse.credential)
+                  }}
+                  onError={() => {
+                    setError('Google authentication failed')
+                  }}
+                  theme="dark"
+                  shape="pill"
+                  size="large"
+                  width="384px"
+                />
               </div>
-              <span className="text-xs text-gray-500">Remember me for 30 days</span>
-            </label>
 
-            {/* Submit */}
-            <motion.button
-              type="submit"
-              disabled={loading}
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
-              className={`mt-2 w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 text-black font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {loading ? 'Processing...' : isSignUp ? 'Sign up to Acharya AI' : 'Sign in to Acharya AI'}
-            </motion.button>
-          </form>
+              {/* Divider */}
+              <div className="relative my-7 flex items-center">
+                <div className="flex-1 border-t border-white/[0.07]" />
+                <span className="mx-4 text-[11px] font-medium text-gray-600 uppercase tracking-widest">or</span>
+                <div className="flex-1 border-t border-white/[0.07]" />
+              </div>
 
-          {/* Footer note */}
-          <p className="mt-8 text-center text-[11px] text-gray-600 leading-relaxed">
-            By signing in, you agree to our{' '}
-            <a href="#" className="text-gray-500 hover:text-emerald-400 transition-colors">Terms of Service</a>
-            {' '}and{' '}
-            <a href="#" className="text-gray-500 hover:text-emerald-400 transition-colors">Privacy Policy</a>.
-          </p>
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="space-y-4">
+
+                {error && (
+                  <div className="p-3.5 rounded-xl border border-red-500/20 bg-red-500/10 text-xs font-semibold text-red-400 leading-relaxed">
+                    {error}
+                  </div>
+                )}
+
+                {isSignUp && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-2"
+                  >
+                    <label htmlFor="name" className="block text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+                      Full Name
+                    </label>
+                    <div className={`relative flex items-center rounded-xl border transition-all duration-200 ${focusedField === 'name' ? 'border-emerald-500/60 bg-emerald-500/[0.04] shadow-[0_0_0_3px_rgba(52,211,153,0.08)]' : 'border-white/[0.08] bg-white/[0.02]'}`}>
+                      <HiUser className="pointer-events-none absolute left-3.5 text-gray-600" size={17} />
+                      <input
+                        id="name"
+                        name="name"
+                        type="text"
+                        required={isSignUp}
+                        placeholder="John Doe"
+                        onFocus={() => setFocusedField('name')}
+                        onBlur={() => setFocusedField(null)}
+                        className="w-full bg-transparent py-3 pl-11 pr-4 text-sm text-white placeholder-gray-600 focus:outline-none"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Email */}
+                <div>
+                  <label htmlFor="email" className="block text-[11px] font-semibold uppercase tracking-widest text-gray-500 mb-2">
+                    Email address
+                  </label>
+                  <div className={`relative flex items-center rounded-xl border transition-all duration-200 ${focusedField === 'email' ? 'border-emerald-500/60 bg-emerald-500/[0.04] shadow-[0_0_0_3px_rgba(52,211,153,0.08)]' : 'border-white/[0.08] bg-white/[0.02]'}`}>
+                    <HiMail className="pointer-events-none absolute left-3.5 text-gray-600" size={17} />
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      placeholder="you@school.edu"
+                      pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+                      title="Please enter a valid email address (e.g. user@example.com)"
+                      onFocus={() => setFocusedField('email')}
+                      onBlur={() => setFocusedField(null)}
+                      className="w-full bg-transparent py-3 pl-11 pr-4 text-sm text-white placeholder-gray-600 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label htmlFor="password" className="block text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+                      Password
+                    </label>
+                    <a href="#" className="text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors font-medium">
+                      Forgot password?
+                    </a>
+                  </div>
+                  <div className={`relative flex items-center rounded-xl border transition-all duration-200 ${focusedField === 'password' ? 'border-emerald-500/60 bg-emerald-500/[0.04] shadow-[0_0_0_3px_rgba(52,211,153,0.08)]' : 'border-white/[0.08] bg-white/[0.02]'}`}>
+                    <HiLockClosed className="pointer-events-none absolute left-3.5 text-gray-600" size={17} />
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      required
+                      placeholder="••••••••"
+                      onFocus={() => setFocusedField('password')}
+                      onBlur={() => setFocusedField(null)}
+                      className="w-full bg-transparent py-3 pl-11 pr-11 text-sm text-white placeholder-gray-600 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 text-gray-600 hover:text-gray-300 transition-colors"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <HiEyeOff size={17} /> : <HiEye size={17} />}
+                    </button>
+                  </div>
+                </div>
+
+                {isSignUp && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-2"
+                  >
+                    <label htmlFor="role" className="block text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+                      Role
+                    </label>
+                    <div className="relative flex items-center rounded-xl border border-white/[0.08] bg-[#020604]">
+                      <select
+                        id="role"
+                        name="role"
+                        defaultValue="Teacher"
+                        className="w-full bg-[#020604] py-3.5 px-4 rounded-xl text-sm text-white focus:outline-none border-none cursor-pointer"
+                      >
+                        <option value="Teacher">Teacher</option>
+                        <option value="Student">Student</option>
+                        <option value="Parent">Parent</option>
+                      </select>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Remember me */}
+                <label className="flex cursor-pointer items-center gap-2.5 select-none pt-1">
+                  <div
+                    onClick={() => setRememberMe(!rememberMe)}
+                    className={`w-4 h-4 rounded flex items-center justify-center border transition-all duration-200 shrink-0 cursor-pointer ${rememberMe ? 'bg-emerald-500 border-emerald-500' : 'bg-white/[0.03] border-white/10'}`}
+                  >
+                    {rememberMe && (
+                      <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 12 12">
+                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-500">Remember me for 30 days</span>
+                </label>
+
+                {/* Submit */}
+                <motion.button
+                  type="submit"
+                  disabled={loading}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`mt-2 w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-400 text-black font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {loading ? 'Processing...' : isSignUp ? 'Sign up to Acharya AI' : 'Sign in to Acharya AI'}
+                </motion.button>
+              </form>
+
+              {/* Footer note */}
+              <p className="mt-8 text-center text-[11px] text-gray-600 leading-relaxed">
+                By signing in, you agree to our{' '}
+                <a href="#" className="text-gray-500 hover:text-emerald-400 transition-colors">Terms of Service</a>
+                {' '}and{' '}
+                <a href="#" className="text-gray-500 hover:text-emerald-400 transition-colors">Privacy Policy</a>.
+              </p>
+            </>
+          )}
         </motion.div>
       </main>
     </div>

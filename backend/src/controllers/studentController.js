@@ -30,6 +30,7 @@ export const createStudent = async (req, res) => {
           email: parentEmail,
           password: 'parentpassword123',
           role: 'Parent',
+          isVerified: true,
         });
         console.log(`Created parent user automatically for: ${parentEmail}`);
       }

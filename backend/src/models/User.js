@@ -36,6 +36,16 @@ const userSchema = new mongoose.Schema(
       enum: ['Teacher', 'Student', 'Parent'],
       default: 'Teacher',
     },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationOTP: {
+      type: String,
+    },
+    verificationOTPExpires: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

@@ -20,6 +20,9 @@ export const protect = async (req, res, next) => {
       if (!req.user) {
         return res.status(401).json({ message: 'Not authorized, user not found' });
       }
+      if (!req.user.isVerified) {
+        return res.status(401).json({ message: 'Please verify your email address first' });
+      }
 
       next();
     } catch (error) {
