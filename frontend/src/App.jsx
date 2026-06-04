@@ -14,7 +14,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/professor-dashboard" element={<Dashboard />} />
         </Routes>
       </BrowserRouter>
     </GoogleOAuthProvider>

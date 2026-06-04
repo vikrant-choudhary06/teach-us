@@ -1,19 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   HiArrowLeft,
-  HiMail,
-  HiLockClosed,
-  HiEye,
-  HiEyeOff,
   HiBookOpen,
-  HiUser,
 } from 'react-icons/hi'
 import { GoogleLogin } from '@react-oauth/google'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-
 
 const stats = [
   { value: '50K+', label: 'Active Teachers' },
@@ -28,77 +22,16 @@ const features = [
 ]
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
-  const [focusedField, setFocusedField] = useState(null)
-  const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [showOTPVerification, setShowOTPVerification] = useState(false)
-  const [verificationEmail, setVerificationEmail] = useState('')
-  const [otp, setOtp] = useState(['', '', '', '', '', ''])
-  const [otpTimer, setOtpTimer] = useState(60)
-  const [isResending, setIsResending] = useState(false)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    let interval;
-    if (showOTPVerification && otpTimer > 0) {
-      interval = setInterval(() => {
-        setOtpTimer((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [showOTPVerification, otpTimer]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-
-    const name = e.target.name?.value
-    const email = e.target.email.value
-    const password = e.target.password.value
-    const role = e.target.role?.value || 'Teacher'
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!email || !emailRegex.test(email)) {
-      setError('Please enter a valid email address (e.g. user@example.com)')
-      setLoading(false)
-      return
-    }
-
-    const endpoint = isSignUp ? '/api/auth/register' : '/api/auth/login'
-    const payload = isSignUp ? { name, email, password, role } : { email, password }
-
-    try {
-      const res = await fetch(`${API_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Something went wrong')
-      }
-
-      if (isSignUp || data.status === 'UNVERIFIED') {
-        setVerificationEmail(email)
-        setShowOTPVerification(true)
-        setOtpTimer(60)
-        setOtp(['', '', '', '', '', ''])
-      } else {
-        localStorage.setItem('userEmail', data.email)
-        localStorage.setItem('userInfo', JSON.stringify(data))
-        navigate('/dashboard')
-      }
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    e.currentTarget.style.setProperty('--x', `${x}px`)
+    e.currentTarget.style.setProperty('--y', `${y}px`)
   }
 
   const handleGoogleSuccess = async (credential) => {
@@ -120,7 +53,7 @@ export default function LoginPage() {
 
       localStorage.setItem('userEmail', data.email)
       localStorage.setItem('userInfo', JSON.stringify(data))
-      navigate('/dashboard')
+      navigate('/professor-dashboard')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -128,119 +61,33 @@ export default function LoginPage() {
     }
   }
 
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    const otpCode = otp.join('');
-    if (otpCode.length !== 6) {
-      setError('Please enter all 6 digits of the verification code.');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_URL}/api/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: verificationEmail, otp: otpCode }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Verification failed');
-      }
-
-      localStorage.setItem('userEmail', data.email);
-      localStorage.setItem('userInfo', JSON.stringify(data));
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendOTP = async () => {
-    setError('');
-    setIsResending(true);
-
-    try {
-      const res = await fetch(`${API_URL}/api/auth/resend-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: verificationEmail }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Failed to resend code');
-      }
-
-      setOtpTimer(60);
-      setOtp(['', '', '', '', '', '']);
-      setError('');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsResending(false);
-    }
-  };
-
-  const handleOtpChange = (value, index) => {
-    if (isNaN(value)) return;
-    const newOtp = [...otp];
-    newOtp[index] = value.substring(value.length - 1);
-    setOtp(newOtp);
-
-    // Focus next box
-    if (value !== '' && index < 5) {
-      const nextInput = document.getElementById(`otp-${index + 1}`);
-      if (nextInput) nextInput.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (e, index) => {
-    if (e.key === 'Backspace') {
-      if (otp[index] === '' && index > 0) {
-        const prevInput = document.getElementById(`otp-${index - 1}`);
-        if (prevInput) {
-          prevInput.focus();
-          const newOtp = [...otp];
-          newOtp[index - 1] = '';
-          setOtp(newOtp);
-        }
-      }
-    }
-  };
-
   return (
-    <div className="min-h-screen w-full flex overflow-hidden bg-[#020604]">
+    <div onMouseMove={handleMouseMove} className="min-h-screen w-full flex overflow-hidden bg-[#020604] text-[#f1f5f9] font-sans relative premium-glow-global">
+      {/* Background Orbits */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute top-[-250px] left-[-250px] w-[800px] h-[800px] rounded-full bg-emerald-500/[0.04] blur-[150px]" />
+        <div className="absolute bottom-[-150px] right-[-150px] w-[700px] h-[700px] rounded-full bg-green-500/[0.03] blur-[140px]" />
+      </div>
 
       {/* ── LEFT PANEL ── */}
       <motion.aside
         initial={{ opacity: 0, x: -40 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.7, ease: 'easeOut' }}
-        className="hidden lg:flex flex-col justify-between relative w-[48%] min-h-screen px-14 py-12 overflow-hidden"
-        style={{ background: 'linear-gradient(145deg, #040f07 0%, #061209 40%, #020705 100%)' }}
+        className="hidden lg:flex flex-col justify-between relative w-[46%] min-h-screen px-14 py-12 overflow-hidden shrink-0 border-r border-white/[0.06] bg-gradient-to-br from-[#040f07] via-[#061209] to-[#020705]"
       >
-        {/* Animated glow orbs */}
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="absolute top-[-80px] left-[-80px] w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[120px] animate-pulse" />
-          <div className="absolute bottom-[-60px] right-[-60px] w-[400px] h-[400px] rounded-full bg-green-400/8 blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full bg-emerald-600/5 blur-[80px]" />
+        {/* Animated glow orbs inside left panel */}
+        <div className="pointer-events-none absolute inset-0 z-0" aria-hidden="true">
+          <div className="absolute top-[-80px] left-[-80px] w-[450px] h-[450px] rounded-full bg-emerald-500/10 blur-[120px] animate-pulse" />
+          <div className="absolute bottom-[-60px] right-[-60px] w-[350px] h-[350px] rounded-full bg-green-400/8 blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
         </div>
 
         {/* Grid overlay */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.03]"
+          className="pointer-events-none absolute inset-0 opacity-[0.02]"
           style={{
             backgroundImage: 'linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
+            backgroundSize: '48px 48px',
           }}
         />
 
@@ -248,138 +95,153 @@ export default function LoginPage() {
         <div className="relative z-10">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-xs font-medium text-gray-500 hover:text-gray-300 transition-colors tracking-wide uppercase"
+            className="inline-flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-gray-300 transition-all tracking-wider uppercase"
           >
             <HiArrowLeft size={14} />
             Back to home
           </Link>
 
-          <div className="mt-12 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-              <HiBookOpen className="text-white" size={20} />
+          <div className="mt-16 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shadow-[0_4px_20px_rgba(16,185,129,0.35)] border border-emerald-400/30">
+              <HiBookOpen className="text-black" size={20} />
             </div>
-            <span className="text-xl font-bold tracking-tight text-white font-space">
+            <span className="text-xl font-black tracking-tight text-white font-space">
               Acharya <span className="text-emerald-400">AI</span>
             </span>
           </div>
 
           {/* Headline */}
-          <div className="mt-16">
+          <div className="mt-20">
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.6 }}
-              className="text-4xl xl:text-5xl font-black leading-[1.1] text-white tracking-tight font-space"
+              transition={{ delay: 0.2, duration: 0.6 }}
+              className="text-4xl xl:text-5xl font-black leading-[1.15] text-white tracking-tight font-space"
             >
-              Welcome back,<br />
+              Empower your<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-300">
-                educator.
+                teaching desk.
               </span>
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.6 }}
-              className="mt-5 text-sm text-gray-400 leading-relaxed max-w-sm"
+              transition={{ delay: 0.3, duration: 0.6 }}
+              className="mt-5 text-sm text-gray-400 leading-relaxed max-w-sm font-semibold"
             >
-              Sign in to manage your classes, track attendance, and keep every student on the path to success.
+              Deploy worksheets, verify real-time class engagement metrics, and digitize exam sheets in seconds.
             </motion.p>
           </div>
 
           {/* Feature list */}
-          <ul className="mt-10 space-y-4">
+          <ul className="mt-12 space-y-5">
             {features.map((f, i) => (
               <motion.li
                 key={i}
                 initial={{ opacity: 0, x: -16 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 + i * 0.1 }}
-                className="flex items-center gap-3.5"
+                transition={{ delay: 0.4 + i * 0.1 }}
+                className="flex items-center gap-4 group"
               >
-                <span className="w-9 h-9 rounded-lg bg-white/[0.04] border border-white/[0.07] flex items-center justify-center text-base shrink-0">
+                <span className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center text-lg shrink-0 group-hover:border-emerald-500/30 group-hover:bg-emerald-500/5 transition-all">
                   {f.icon}
                 </span>
-                <span className="text-sm text-gray-300">{f.text}</span>
+                <span className="text-sm text-gray-300 font-bold group-hover:text-white transition-colors">{f.text}</span>
               </motion.li>
             ))}
           </ul>
+        </div>
 
-          {/* Stats row */}
+        {/* Bottom copyright & Stats row */}
+        <div className="relative z-10 space-y-10">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 }}
-            className="mt-14 flex gap-8"
+            transition={{ delay: 0.7 }}
+            className="flex gap-10 border-t border-white/[0.06] pt-8"
           >
             {stats.map((s, i) => (
               <div key={i}>
-                <p className="text-2xl font-black text-white tracking-tight">{s.value}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+                <p className="text-2xl font-black text-white font-space tracking-tight">{s.value}</p>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">{s.label}</p>
               </div>
             ))}
           </motion.div>
+          <p className="text-xs text-gray-600 font-bold">
+            © 2026 Acharya AI. Crafted for progressive educators.
+          </p>
         </div>
-
-        {/* Bottom copyright */}
-        <p className="relative z-10 text-xs text-gray-600">
-          © 2026 Acharya AI. Built for modern classrooms.
-        </p>
       </motion.aside>
 
-      {/* Divider line */}
-      <div className="hidden lg:block w-px bg-white/[0.05] self-stretch" />
-
       {/* ── RIGHT PANEL (Form) ── */}
-      <main className="flex flex-1 flex-col justify-center items-center px-6 py-12 sm:px-10 relative bg-[#020604]">
-
-        {/* Subtle top-right glow */}
-        <div className="pointer-events-none absolute top-0 right-0 w-80 h-80 rounded-full bg-emerald-500/5 blur-[100px]" aria-hidden="true" />
+      <main className="flex flex-1 flex-col justify-center items-center px-6 py-12 sm:px-10 relative bg-[#020604] z-10">
+        <div className="pointer-events-none absolute top-0 right-0 w-96 h-96 rounded-full bg-emerald-500/5 blur-[120px]" aria-hidden="true" />
 
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="w-full max-w-sm"
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="w-full max-w-md p-8 sm:p-12 rounded-3xl border border-white/[0.08] bg-[#070b09]/40 backdrop-blur-2xl shadow-[0_20_50_rgba(0,0,0,0.5)] flex flex-col items-center"
         >
-          {/* Mobile logo */}
-          <div className="lg:hidden mb-10 flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-              <HiBookOpen className="text-white" size={18} />
+          {/* Logo */}
+          <div className="mb-10 flex justify-center">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/20">
+                <HiBookOpen className="text-black" size={20} />
+              </div>
+              <span className="text-xl font-black text-white font-space">Acharya <span className="text-emerald-400">AI</span></span>
             </div>
-            <span className="text-lg font-bold text-white">Acharya <span className="text-emerald-400">AI</span></span>
           </div>
 
-          <h2 className="text-3xl font-black text-white tracking-tight font-space text-center">
-            Sign in to Acharya AI
-          </h2>
-          <p className="mt-2 text-sm text-gray-500 text-center">
-            Secure, passwordless access using your Google account
-          </p>
+          <div className="text-center space-y-3 mb-10">
+            <h2 className="text-3xl font-black text-white tracking-tight font-space animate-pulse">
+              Sign In to Acharya AI
+            </h2>
+            <p className="text-xs text-gray-400 font-semibold max-w-[280px] mx-auto leading-relaxed">
+              Secure, single sign-on using your institutional Google account.
+            </p>
+          </div>
 
-          {/* Google button */}
-          <div className="mt-10 flex w-full justify-center">
-            <GoogleLogin
-              onSuccess={(credentialResponse) => {
-                handleGoogleSuccess(credentialResponse.credential)
-              }}
-              onError={() => {
-                setError('Google authentication failed')
-              }}
-              theme="dark"
-              shape="pill"
-              size="large"
-              width="384px"
-            />
+          {/* Interactive Google Sign In Button Container */}
+          <div className="w-full flex flex-col items-center justify-center p-6 border border-white/[0.04] bg-[#0a0f0c]/60 rounded-2xl relative overflow-hidden group hover:border-emerald-500/20 transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/[0.02] to-emerald-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            
+            {loading ? (
+              <div className="py-2.5 flex flex-col items-center gap-3">
+                <svg className="animate-spin h-6 w-6 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-xs text-emerald-400 font-bold font-space uppercase tracking-widest animate-pulse">Authenticating...</span>
+              </div>
+            ) : (
+              <GoogleLogin
+                onSuccess={(credentialResponse) => {
+                  handleGoogleSuccess(credentialResponse.credential)
+                }}
+                onError={() => {
+                  setError('Google authentication failed. Please try again.')
+                }}
+                theme="dark"
+                shape="pill"
+                size="large"
+                width="320px"
+              />
+            )}
           </div>
 
           {error && (
-            <div className="mt-6 p-3.5 rounded-xl border border-red-500/20 bg-red-500/10 text-xs font-semibold text-red-400 leading-relaxed text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 w-full p-4 rounded-xl border border-red-500/20 bg-red-500/10 text-xs font-semibold text-red-400 leading-relaxed text-center"
+            >
               {error}
-            </div>
+            </motion.div>
           )}
 
           {/* Footer note */}
-          <p className="mt-12 text-center text-[11px] text-gray-600 leading-relaxed">
+          <p className="mt-12 text-center text-[10px] font-bold text-gray-600 leading-relaxed">
             By signing in, you agree to our{' '}
             <a href="#" className="text-gray-500 hover:text-emerald-400 transition-colors">Terms of Service</a>
             {' '}and{' '}
