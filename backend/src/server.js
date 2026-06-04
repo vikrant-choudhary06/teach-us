@@ -3,6 +3,7 @@ import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import mongoose from 'mongoose';
 
 
 import { connectDB } from './config/db.js';
@@ -26,7 +27,29 @@ const app = express();
 const server = http.createServer(app);
 
 
-app.use(cors());
+const allowedOrigins = [
+  'https://teach-us.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5000',
+  'http://localhost:3000'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const isAllowed = allowedOrigins.includes(origin) || 
+                      origin.endsWith('.vercel.app') || 
+                      origin.startsWith('http://localhost:');
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -40,6 +63,22 @@ app.use('/api/class', classRoutes);
 app.use('/api/grader', graderRoutes);
 app.use('/api/lessons', lessonRoutes);
 
+
+app.get('/api/health', (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const dbStatus = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting',
+  }[dbState] || 'unknown';
+
+  res.json({
+    status: 'online',
+    database: dbStatus,
+    timestamp: new Date(),
+  });
+});
 
 app.get('/', (req, res) => {
   res.json({
@@ -71,7 +110,7 @@ initSocket(server);
 startCronJobs();
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`====================================================`);
   console.log(` ClassOS Backend Engine active on port ${PORT}`);
   console.log(` Live Environment: http://localhost:${PORT}`);

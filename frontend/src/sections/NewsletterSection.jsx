@@ -9,6 +9,13 @@ export default function NewsletterSection() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!email) return;
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+
     setStatus('submitting');
     setTimeout(() => {
       setStatus('success');
@@ -75,6 +82,8 @@ export default function NewsletterSection() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
+                  pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
+                  title="Please enter a valid email address (e.g. user@example.com)"
                   className="flex-1 bg-transparent border-0 outline-none text-white placeholder-gray-500 text-sm py-2.5 px-3 focus:ring-0 focus:outline-none w-full"
                   disabled={status === 'submitting'}
                 />
