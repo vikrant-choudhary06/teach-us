@@ -46,6 +46,13 @@ export default function LoginPage() {
     const password = e.target.password.value
     const role = e.target.role?.value || 'Teacher'
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!email || !emailRegex.test(email)) {
+      setError('Please enter a valid email address (e.g. user@example.com)')
+      setLoading(false)
+      return
+    }
+
     const endpoint = isSignUp ? '/api/auth/register' : '/api/auth/login'
     const payload = isSignUp ? { name, email, password, role } : { email, password }
 
@@ -320,6 +327,8 @@ export default function LoginPage() {
                   autoComplete="email"
                   required
                   placeholder="you@school.edu"
+                  pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+                  title="Please enter a valid email address (e.g. user@example.com)"
                   onFocus={() => setFocusedField('email')}
                   onBlur={() => setFocusedField(null)}
                   className="w-full bg-transparent py-3 pl-11 pr-4 text-sm text-white placeholder-gray-600 focus:outline-none"

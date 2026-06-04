@@ -9,6 +9,14 @@ import Gradebook from '../models/Gradebook.js';
 export const createStudent = async (req, res) => {
   const { name, email, parentEmail, classroom } = req.body;
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (email && !emailRegex.test(email)) {
+    return res.status(400).json({ message: 'Please provide a valid student email address' });
+  }
+  if (parentEmail && !emailRegex.test(parentEmail)) {
+    return res.status(400).json({ message: 'Please provide a valid parent email address' });
+  }
+
   try {
     let parentId = null;
 

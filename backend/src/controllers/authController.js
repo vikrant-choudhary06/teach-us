@@ -16,6 +16,11 @@ const generateToken = (id) => {
 export const registerUser = async (req, res) => {
   const { name, email, password, role } = req.body;
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || !emailRegex.test(email)) {
+    return res.status(400).json({ message: 'Please provide a valid email address' });
+  }
+
   try {
     const userExists = await User.findOne({ email });
 
@@ -51,6 +56,11 @@ export const registerUser = async (req, res) => {
 
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || !emailRegex.test(email)) {
+    return res.status(400).json({ message: 'Please provide a valid email address' });
+  }
 
   try {
     const user = await User.findOne({ email });
