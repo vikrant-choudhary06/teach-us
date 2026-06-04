@@ -84,16 +84,9 @@ export default function LoginPage() {
         throw new Error(data.message || 'Something went wrong')
       }
 
-      if (isSignUp || data.status === 'UNVERIFIED') {
-        setVerificationEmail(email)
-        setShowOTPVerification(true)
-        setOtpTimer(60)
-        setOtp(['', '', '', '', '', ''])
-      } else {
-        localStorage.setItem('userEmail', data.email)
-        localStorage.setItem('userInfo', JSON.stringify(data))
-        navigate('/dashboard')
-      }
+      localStorage.setItem('userEmail', data.email)
+      localStorage.setItem('userInfo', JSON.stringify(data))
+      navigate('/dashboard')
     } catch (err) {
       setError(err.message)
     } finally {

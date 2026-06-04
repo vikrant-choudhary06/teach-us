@@ -1,7 +1,7 @@
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
-import { sendVerificationOTP } from '../services/emailService.js';
+import { sendVerificationOTP, sendWelcomeEmail } from '../services/emailService.js';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -22,56 +22,34 @@ export const registerUser = async (req, res) => {
     return res.status(400).json({ message: 'Please provide a valid email address' });
   }
 
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
   try {
     const userExists = await User.findOne({ email });
 
     if (userExists) {
-      if (userExists.isVerified) {
-        return res.status(400).json({ message: 'User already exists' });
-      }
-
-      // If user exists but is not verified, overwrite credentials and send new OTP (auto-verify if test email)
-      const isTestEmail = email === 'teacher@school.edu';
-      userExists.name = name;
-      userExists.password = password;
-      userExists.role = role || 'Teacher';
-      userExists.isVerified = isTestEmail;
-      userExists.verificationOTP = isTestEmail ? undefined : otp;
-      userExists.verificationOTPExpires = isTestEmail ? undefined : new Date(Date.now() + 10 * 60 * 1000);
-      await userExists.save();
-
-      if (!isTestEmail) {
-        await sendVerificationOTP(email, name, otp);
-      }
-
-      return res.status(201).json({
-        message: isTestEmail ? 'Signup successful' : 'Verification OTP sent to your email',
-        email: userExists.email,
-      });
+      return res.status(400).json({ message: 'User already exists' });
     }
-
-    const isTestEmail = email === 'teacher@school.edu';
 
     const user = await User.create({
       name,
       email,
       password,
       role: role || 'Teacher',
-      isVerified: isTestEmail,
-      verificationOTP: isTestEmail ? undefined : otp,
-      verificationOTPExpires: isTestEmail ? undefined : new Date(Date.now() + 10 * 60 * 1000),
+      isVerified: true,
     });
 
     if (user) {
-      if (!isTestEmail) {
-        await sendVerificationOTP(email, name, otp);
-      }
+      // Send welcome email asynchronously
+      sendWelcomeEmail(email, name).catch((err) => {
+        console.error(`Failed to send welcome email to ${email}:`, err.message);
+      });
       
       res.status(201).json({
-        message: isTestEmail ? 'Signup successful' : 'Verification OTP sent to your email',
+        _id: user._id,
+        name: user.name,
         email: user.email,
+        role: user.role,
+        token: generateToken(user._id),
+        message: 'Signup successful',
       });
     } else {
       res.status(400).json({ message: 'Invalid user data' });
@@ -97,18 +75,8 @@ export const loginUser = async (req, res) => {
 
     if (user && (await user.comparePassword(password))) {
       if (!user.isVerified) {
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        user.verificationOTP = otp;
-        user.verificationOTPExpires = new Date(Date.now() + 10 * 60 * 1000);
+        user.isVerified = true;
         await user.save();
-
-        await sendVerificationOTP(user.email, user.name, otp);
-
-        return res.status(200).json({
-          status: 'UNVERIFIED',
-          message: 'Please verify your email address. A new OTP has been sent.',
-          email: user.email,
-        });
       }
 
       res.json({

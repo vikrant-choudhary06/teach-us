@@ -2,28 +2,67 @@ import nodemailer from 'nodemailer';
 
 
 const createTransporter = () => {
-
-  if (!process.env.EMAIL_USER || process.env.EMAIL_USER === 'test@example.com') {
+  // 1. Resend HTTP API Mode (ideal for Render where SMTP is blocked)
+  if (process.env.RESEND_API_KEY) {
     return {
       sendMail: async (mailOptions) => {
-        console.log('\n=================== MOCK EMAIL SENT ===================');
-        console.log(`To:      ${mailOptions.to}`);
-        console.log(`Subject: ${mailOptions.subject}`);
-        console.log('--------------------- HTML BODY ---------------------');
-        console.log(mailOptions.html);
-        console.log('========================================================\n');
-        return { messageId: 'mock-id-' + Date.now() };
+        console.log(`[Resend Mode] Sending email to ${mailOptions.to}`);
+        try {
+          const resendFrom = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+          const resolvedFrom = `"Acharya AI" <${resendFrom}>`;
+
+          const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+            },
+            body: JSON.stringify({
+              from: resolvedFrom,
+              to: mailOptions.to,
+              subject: mailOptions.subject,
+              html: mailOptions.html,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Resend API error: ${response.status} - ${errorText}`);
+          }
+
+          const data = await response.json();
+          return { messageId: data.id };
+        } catch (err) {
+          console.error('Error sending via Resend HTTP API:', err);
+          throw err;
+        }
       },
     };
   }
 
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+  // 2. SMTP Mode (Gmail)
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS && process.env.EMAIL_USER !== 'test@example.com') {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+  }
+
+  // 3. Mock Mode (Default fallback when no credentials are provided)
+  return {
+    sendMail: async (mailOptions) => {
+      console.log('\n=================== MOCK EMAIL SENT ===================');
+      console.log(`To:      ${mailOptions.to}`);
+      console.log(`Subject: ${mailOptions.subject}`);
+      console.log('--------------------- HTML BODY ---------------------');
+      console.log(mailOptions.html);
+      console.log('========================================================\n');
+      return { messageId: 'mock-id-' + Date.now() };
     },
-  });
+  };
 };
 
 export const sendAbsentAlert = async (parentEmail, studentName, studyGuideMarkdown, makeupAssignment) => {
@@ -217,3 +256,52 @@ export const sendVerificationOTP = async (email, name, otp) => {
   }
 };
 
+export const sendWelcomeEmail = async (email, name) => {
+  const transporter = createTransporter();
+
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; background-color: #fcfcfc;">
+      <div style="text-align: center; border-bottom: 2px solid #10b981; padding-bottom: 15px; margin-bottom: 20px;">
+        <h2 style="color: #10b981; margin: 0;">Welcome to Acharya AI!</h2>
+        <p style="color: #6b7280; font-size: 14px; margin: 5px 0 0 0;">Empowering educators with AI tools</p>
+      </div>
+
+      <p>Hello ${name || 'Educator'},</p>
+      <p>Welcome to <strong>Acharya AI</strong> (ClassOS Ecosystem). We are excited to have you on board!</p>
+      
+      <p>With Acharya AI, you can easily manage your classroom administration, log student attendance, auto-generate study guides from whiteboard logs, grade homework using AI, and keep parents updated automatically.</p>
+
+      <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 8px;">
+        <h3 style="margin-top: 0; color: #0f5132;">Getting Started Checklist:</h3>
+        <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #14532d; line-height: 1.6;">
+          <li>Create or join a classroom session</li>
+          <li>Add students to your registry</li>
+          <li>Transcribe lectures and generate automated study guides</li>
+          <li>Try the AI Homework Grader with rubrics</li>
+        </ul>
+      </div>
+
+      <p>If you have any questions or need help setting up, please check our documentation or contact support.</p>
+      
+      <p style="margin-top: 25px; font-size: 11px; color: #9ca3af; text-align: center; border-top: 1px solid #f3f4f6; padding-top: 15px;">
+        Acharya AI Ecosystem - Modern tools for modern classrooms.
+      </p>
+    </div>
+  `;
+
+  const mailOptions = {
+    from: `"Acharya AI" <${process.env.EMAIL_USER || 'classos@school.edu'}>`,
+    to: email,
+    subject: 'Welcome to Acharya AI! (ClassOS Ecosystem)',
+    html: htmlContent,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Welcome email sent successfully to ${email}. Info ID: ${info.messageId}`);
+    return info;
+  } catch (error) {
+    console.error(`Error sending welcome email to ${email}:`, error);
+    throw error;
+  }
+};
