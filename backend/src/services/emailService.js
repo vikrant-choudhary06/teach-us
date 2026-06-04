@@ -3,45 +3,52 @@ import nodemailer from 'nodemailer';
 
 const createTransporter = () => {
   // 1. Resend HTTP API Mode (ideal for Render where SMTP is blocked)
-  if (process.env.RESEND_API_KEY) {
-    return {
-      sendMail: async (mailOptions) => {
-        console.log(`[Resend Mode] Sending email to ${mailOptions.to}`);
-        try {
-          const resendFrom = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-          const resolvedFrom = `"Acharya AI" <${resendFrom}>`;
+  if (process.env.USE_RESEND === 'true') {
+    if (!process.env.RESEND_API_KEY) {
+      console.warn('⚠️ WARNING: USE_RESEND is true but RESEND_API_KEY is not configured. Falling back to Mock Mode.');
+    } else {
+      return {
+        sendMail: async (mailOptions) => {
+          console.log(`[Resend Mode] Sending email to ${mailOptions.to}`);
+          try {
+            const resendFrom = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+            const resolvedFrom = `"Acharya AI" <${resendFrom}>`;
 
-          const response = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-            },
-            body: JSON.stringify({
-              from: resolvedFrom,
-              to: mailOptions.to,
-              subject: mailOptions.subject,
-              html: mailOptions.html,
-            }),
-          });
+            const response = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+              },
+              body: JSON.stringify({
+                from: resolvedFrom,
+                to: mailOptions.to,
+                subject: mailOptions.subject,
+                html: mailOptions.html,
+              }),
+            });
 
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Resend API error: ${response.status} - ${errorText}`);
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Resend API error: ${response.status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+            return { messageId: data.id };
+          } catch (err) {
+            console.error('Error sending via Resend HTTP API:', err);
+            throw err;
           }
-
-          const data = await response.json();
-          return { messageId: data.id };
-        } catch (err) {
-          console.error('Error sending via Resend HTTP API:', err);
-          throw err;
-        }
-      },
-    };
+        },
+      };
+    }
   }
 
-  // 2. SMTP Mode (Gmail)
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS && process.env.EMAIL_USER !== 'test@example.com') {
+  // 2. SMTP Mode (Gmail) - Active if USE_RESEND is false, or if undefined but SMTP credentials are provided
+  if (
+    process.env.USE_RESEND === 'false' ||
+    (!process.env.USE_RESEND && process.env.EMAIL_USER && process.env.EMAIL_PASS && process.env.EMAIL_USER !== 'test@example.com')
+  ) {
     return nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -51,7 +58,7 @@ const createTransporter = () => {
     });
   }
 
-  // 3. Mock Mode (Default fallback when no credentials are provided)
+  // 3. Mock Mode (Default fallback when no credentials or config is provided)
   return {
     sendMail: async (mailOptions) => {
       console.log('\n=================== MOCK EMAIL SENT ===================');
