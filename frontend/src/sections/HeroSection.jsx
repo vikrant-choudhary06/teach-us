@@ -198,7 +198,7 @@ export default function HeroSection() {
                 <div className="w-3 h-3 rounded-full bg-green-500/80" />
               </div>
               <span className="mx-auto text-[11px] text-gray-500 font-medium tracking-wide">
-                acharya.ai/dashboard
+                acharya.ai/professor-dashboard
               </span>
             </div>
 
