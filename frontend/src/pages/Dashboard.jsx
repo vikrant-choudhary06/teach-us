@@ -415,27 +415,7 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error(err)
-      // Offline fallback: save locally
-      setStudents(prev => {
-        const index = prev.length
-        const updated = [...prev, {
-          id: 'local-' + Date.now(),
-          name,
-          email,
-          status: 'focused',
-          lastActive: 'Active now',
-          assignmentStatus: 'Not Started',
-          currentProgress: 'Idle',
-          doubt: null,
-          row: Math.floor(index / 3),
-          col: index % 3,
-          grade: 'N/A',
-          aiFeedback: ''
-        }]
-        localStorage.setItem('real_students', JSON.stringify(updated))
-        return updated
-      })
-      showToast(`Student "${name}" added locally (Offline).`, 'success')
+      showToast(`Failed to add student. Please check your network connection.`, 'error')
     }
   }
 
@@ -478,6 +458,7 @@ export default function Dashboard() {
       case 'math-helper':
         return (
           <MathHelper
+            showToast={showToast}
             pushWorksheetToClass={pushWorksheetToClass}
             onProblemSolved={() => {
               setWeeklyActivity(prev => prev + 1)
@@ -1927,81 +1908,18 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
   const runDigitization = () => {
     setIsDigitizing(true)
     setTimeout(() => {
-      setDigitizedResult({
-        type: 'grade',
-        title: 'INGESTED QUESTION PAPER - MATH 101',
-        subtitle: 'Processed via Acharya AI OCR engine',
-        score: '20/25',
-        studentName: 'General Ingestion',
-        feedback: 'Calculus steps solved correctly. Minor limit normalization issue in Section A.',
-        sections: [
-          {
-            title: 'Section A: Calculus Foundations',
-            questions: [
-              'Q1. Evaluate the limit: lim(x -> 0) [sin(5x) / 2x]. (3 Marks)',
-              'Q2. Find the derivative of f(x) = e^(3x^2 - 5x + 2). (4 Marks)',
-              'Q3. Compute the integral of x^3 ln(x) dx using integration by parts. (5 Marks)'
-            ]
-          }
-        ]
-      })
       setIsDigitizing(false)
-      if (onAssetCreated) onAssetCreated()
-    }, 2000)
+      showToast('OCR Ingestion Service is currently unavailable. Mock responses have been disabled.', 'error')
+    }, 1000)
   }
 
   const runCameraScan = () => {
     if (isScanning) return
     setIsScanning(true)
-    const targetStudent = students.find(s => s.id === selectedStudentId)
     setTimeout(() => {
-      const scores = ['18/25', '21/25', '23/25', '25/25', '22/25']
-      const feedChoices = [
-        'Demonstrated excellent understanding of differentiation rules. The chain rule application is perfect.',
-        'Good calculus proofs, but integration by parts was left incomplete at the final substitution step.',
-        'Perfect score! All matrices solved, eigenvalues correct, and calculus derivations are completely correct.',
-        'Minor algebraic error in Section A limit formulation. The final answer should be 5/2, not 5.'
-      ]
-      
-      const chosenScore = scores[Math.floor(Math.random() * scores.length)]
-      const chosenFeedback = feedChoices[Math.floor(Math.random() * feedChoices.length)]
-
-      // Update student grade in global state
-      setStudents(prev => prev.map(s => {
-        if (s.id === selectedStudentId) {
-          return {
-            ...s,
-            assignmentStatus: `Submitted (Graded - ${chosenScore})`,
-            grade: chosenScore,
-            aiFeedback: chosenFeedback,
-            status: 'focused'
-          }
-        }
-        return s
-      }))
-
-      setDigitizedResult({
-        type: 'grade',
-        title: `GRADED NOTEBOOK: ${targetStudent ? targetStudent.name.toUpperCase() : 'STUDENT'}`,
-        subtitle: 'OCR Handwritten Grader Output',
-        score: chosenScore,
-        studentName: targetStudent ? targetStudent.name : 'Selected Student',
-        feedback: chosenFeedback,
-        sections: [
-          {
-            title: 'Section A: Student Solutions Ingested',
-            questions: [
-              'Ingested: lim(x->0) [sin(5x) / 2x] = 5/2. -> Correct.',
-              'Ingested: f\'(x) = d/dx [e^(3x^2-5x+2)] = (6x-5)e^(3x^2-5x+2). -> Correct.',
-              'Ingested: Integral x^3 ln(x) dx. -> Partially Complete.'
-            ]
-          }
-        ]
-      })
       setIsScanning(false)
-      showToast(`Marks (${chosenScore}) filled in Gradebook for ${targetStudent ? targetStudent.name : 'student'}!`, 'success')
-      if (onAssetCreated) onAssetCreated()
-    }, 2500)
+      showToast('AI Homework Grader is currently offline. Mock responses have been disabled.', 'error')
+    }, 1000)
   }
 
   return (
@@ -2316,7 +2234,7 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
 }
 
 /* ── MATH HELPER WORKSPACE ── */
-export function MathHelper({ pushWorksheetToClass, onProblemSolved }) {
+export function MathHelper({ pushWorksheetToClass, onProblemSolved, showToast }) {
   const [problem, setProblem] = useState('')
   const [selectedTopic, setSelectedTopic] = useState('Calculus')
   const [solutionSteps, setSolutionSteps] = useState(null)
@@ -2336,18 +2254,9 @@ export function MathHelper({ pushWorksheetToClass, onProblemSolved }) {
     if (!problem.trim()) return
     setIsSolving(true)
     setTimeout(() => {
-      let steps = ["Step 1: Parse the input equation.", "Step 2: Recognize variables and operators.", "Step 3: Apply relevant mathematical theorems.", "Step 4: Simplify output expression."]
-      
-      const allSamples = [...sampleProblems.Calculus, ...sampleProblems.Algebra]
-      const found = allSamples.find(s => s.q.toLowerCase().includes(problem.toLowerCase()) || problem.toLowerCase().includes(s.q.toLowerCase()))
-      if (found) {
-        steps = found.ans
-      }
-      
-      setSolutionSteps(steps)
       setIsSolving(false)
-      if (onProblemSolved) onProblemSolved()
-    }, 1500)
+      showToast('Math Helper Service is currently offline. Mock solutions are disabled.', 'error')
+    }, 1000)
   }
 
   return (
@@ -2640,23 +2549,9 @@ export function LessonPlanner({ setDeployedMaterial, setActiveTab, showToast, on
     if (!topic.trim()) return
     setIsGenerating(true)
     setTimeout(() => {
-      setLessonPlan({
-        title: `Lesson Plan: ${topic}`,
-        subject: subject,
-        grade: grade,
-        duration: duration,
-        objectives: learningObjectives || 'Understand core conceptual models and interactive exercises.',
-        workflow: [
-          { time: '0m - 10m', phase: 'Introduction', title: 'Hook & Context Setting', desc: `Introduce ${topic} in ${subject} class. Check prerequisite knowledge.`, interactive: 'Raise Hand check' },
-          { time: '10m - 25m', phase: 'Core Concept', title: 'Direct Instruction', desc: `Present the primary concepts of ${topic}. Highlight formulas and definitions. Objective: ${learningObjectives || 'Understand core theories'}.`, interactive: 'Whiteboard drawing comparison' },
-          { time: '25m - 35m', phase: 'Active Check', title: 'Interactive Poll', desc: `Run a live class poll to gauge student understanding of the core concept.`, interactive: 'Active understanding check poll' },
-          { time: '35m - 45m', phase: 'Guided Practice', title: 'Student Workstations', desc: `Push an interactive worksheet to all student desks. Monitor live progress in seating grid.`, interactive: 'One-click challenge worksheet' }
-        ]
-      })
       setIsGenerating(false)
-      showToast('AI Lesson Plan generated successfully!', 'success')
-      if (onPlanGenerated) onPlanGenerated()
-    }, 2000)
+      showToast('AI Lesson Planner service is currently offline. Mock generation is disabled.', 'error')
+    }, 1000)
   }
 
   const handleDeploy = () => {
@@ -2857,37 +2752,9 @@ export function VisualAids({ setDeployedMaterial, setActiveTab, showToast, onAid
     if (!prompt.trim()) return
     setIsGenerating(true)
     setTimeout(() => {
-      if (aidType === 'diagram') {
-        setVisualAid({
-          title: `Diagram: ${prompt}`,
-          type: 'diagram',
-          data: {
-            nodes: [
-              { label: 'Input Data', type: 'Source' },
-              { label: 'Feature Extraction', type: 'Process' },
-              { label: 'CNN Weights', type: 'Model' },
-              { label: 'Prediction Output', type: 'Result' }
-            ]
-          }
-        })
-      } else {
-        setVisualAid({
-          title: `Chart: ${prompt}`,
-          type: 'chart',
-          data: {
-            nodes: [{ label: 'Performance', type: 'Metric' }],
-            chartData: [
-              { label: 'Focused students', value: 80 },
-              { label: 'Tabbed out', value: 15 },
-              { label: 'Doubt raising', value: 5 }
-            ]
-          }
-        })
-      }
       setIsGenerating(false)
-      showToast('Visual aid successfully generated!', 'success')
-      if (onAidGenerated) onAidGenerated()
-    }, 2000)
+      showToast('AI Visual Aids service is currently offline. Mock generation is disabled.', 'error')
+    }, 1000)
   }
 
   const handleDeploy = () => {
