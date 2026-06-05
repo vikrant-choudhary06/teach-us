@@ -39,6 +39,9 @@ import {
   HiOutlineRefresh,
   HiOutlineExternalLink,
   HiOutlineLightningBolt,
+  HiOutlineAcademicCap,
+  HiOutlineClock,
+  HiOutlineStar,
 } from 'react-icons/hi'
 
 export default function Dashboard() {
@@ -58,11 +61,35 @@ export default function Dashboard() {
     }
     return localStorage.getItem('colorTheme') || 'fresh'
   })
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('activeTab') || 'overview'
+  })
+  const [settingsTab, setSettingsTab] = useState(() => {
+    return localStorage.getItem('settingsTab') || 'appearance'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab)
+  }, [activeTab])
+
+  useEffect(() => {
+    localStorage.setItem('settingsTab', settingsTab)
+  }, [settingsTab])
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [userEmail, setUserEmail] = useState('educator@acharya.ai')
-  const [userName, setUserName] = useState('Educator')
+  const [userName, setUserName] = useState(() => {
+    const savedName = localStorage.getItem('profile_name')
+    if (savedName) return savedName
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (savedInfo) {
+        const info = JSON.parse(savedInfo)
+        if (info.name) return info.name
+      }
+    } catch (e) {}
+    return 'Educator'
+  })
   const [userPicture, setUserPicture] = useState('')
   const [isAIChatOpen, setIsAIChatOpen] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
@@ -74,7 +101,28 @@ export default function Dashboard() {
     }
     return 30
   })
+  const [totalTopics, setTotalTopics] = useState(() => {
+    return parseInt(localStorage.getItem('stats_totalTopics') || '0', 10)
+  })
+  const [assetsCreated, setAssetsCreated] = useState(() => {
+    return parseInt(localStorage.getItem('stats_assetsCreated') || '0', 10)
+  })
+  const [weeklyActivity, setWeeklyActivity] = useState(() => {
+    return parseInt(localStorage.getItem('stats_weeklyActivity') || '0', 10)
+  })
   const navigate = useNavigate()
+
+  useEffect(() => {
+    localStorage.setItem('stats_totalTopics', totalTopics.toString())
+  }, [totalTopics])
+
+  useEffect(() => {
+    localStorage.setItem('stats_assetsCreated', assetsCreated.toString())
+  }, [assetsCreated])
+
+  useEffect(() => {
+    localStorage.setItem('stats_weeklyActivity', weeklyActivity.toString())
+  }, [weeklyActivity])
 
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -82,6 +130,16 @@ export default function Dashboard() {
     const y = e.clientY - rect.top
     e.currentTarget.style.setProperty('--x', `${x}px`)
     e.currentTarget.style.setProperty('--y', `${y}px`)
+  }
+
+  const markToolUsed = (toolId) => {
+    try {
+      const used = JSON.parse(localStorage.getItem('used_ai_tools') || '[]')
+      if (!used.includes(toolId)) {
+        used.push(toolId)
+        localStorage.setItem('used_ai_tools', JSON.stringify(used))
+      }
+    } catch (e) {}
   }
 
   const [uploadedPages, setUploadedPages] = useState(() => {
@@ -106,27 +164,25 @@ export default function Dashboard() {
   })
 
   const [students, setStudents] = useState(() => {
-    const email = localStorage.getItem('userEmail')
-    if (email && email !== 'educator@acharya.ai') {
-      const saved = localStorage.getItem(`acharyai_${email}_students`)
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { console.error(e); }
-      }
+    try {
+      const saved = localStorage.getItem('real_students')
+      return saved ? JSON.parse(saved) : [
+        { id: 1, name: 'Aarav Sharma', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reviewing slides', doubt: null, row: 0, col: 0, grade: '23/25', aiFeedback: 'Well structured and clear math definitions.' },
+        { id: 2, name: 'Isha Patel', status: 'distracted', lastActive: '2m ago', assignmentStatus: 'Pending', currentProgress: 'Idle', doubt: null, row: 0, col: 1, grade: 'N/A', aiFeedback: '' },
+        { id: 3, name: 'Rohan Das', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Not Started', currentProgress: 'Reading PDF', doubt: 'Need help with Convolutional step', row: 0, col: 2, grade: 'N/A', aiFeedback: '' },
+        { id: 4, name: 'Sanya Sen', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Pending Grade)', currentProgress: 'Note-taking', doubt: null, row: 1, col: 0, grade: 'N/A', aiFeedback: '' },
+        { id: 5, name: 'Aditya Verma', status: 'distracted', lastActive: '5m ago', assignmentStatus: 'Needs Revision', currentProgress: 'Tabbed out', doubt: 'How does max pooling work?', row: 1, col: 1, grade: '12/25', aiFeedback: 'Incomplete matrix computations in section B.' },
+        { id: 6, name: 'Neha Rao', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reading PDF', doubt: null, row: 1, col: 2, grade: '24/25', aiFeedback: 'Excellent reasoning and detailed calculus proofs.' },
+        { id: 7, name: 'Vikram Singh', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Pending', currentProgress: 'Answering Poll', doubt: null, row: 2, col: 0, grade: 'N/A', aiFeedback: '' },
+        { id: 8, name: 'Ananya Goel', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reading PDF', doubt: null, row: 2, col: 1, grade: '21/25', aiFeedback: 'Solid integration steps. Keep practicing limits.' },
+        { id: 9, name: 'Kabir Mehta', status: 'distracted', lastActive: '3m ago', assignmentStatus: 'Not Started', currentProgress: 'Idle', doubt: null, row: 2, col: 2, grade: 'N/A', aiFeedback: '' },
+        { id: 10, name: 'Priya Nair', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Pending Grade)', currentProgress: 'Taking notes', doubt: null, row: 3, col: 0, grade: 'N/A', aiFeedback: '' },
+        { id: 11, name: 'Rishi Kapoor', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Pending', currentProgress: 'Reviewing slides', doubt: null, row: 3, col: 1, grade: 'N/A', aiFeedback: '' },
+        { id: 12, name: 'Tara Iyer', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Answering Poll', doubt: null, row: 3, col: 2, grade: '22/25', aiFeedback: 'Good layout and formula definitions.' },
+      ]
+    } catch (e) {
+      return []
     }
-    return [
-      { id: 1, name: 'Aarav Sharma', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reviewing slides', doubt: null, row: 0, col: 0, grade: '23/25', aiFeedback: 'Well structured and clear math definitions.' },
-      { id: 2, name: 'Isha Patel', status: 'distracted', lastActive: '2m ago', assignmentStatus: 'Pending', currentProgress: 'Idle', doubt: null, row: 0, col: 1, grade: 'N/A', aiFeedback: '' },
-      { id: 3, name: 'Rohan Das', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Not Started', currentProgress: 'Reading PDF', doubt: 'Need help with Convolutional step', row: 0, col: 2, grade: 'N/A', aiFeedback: '' },
-      { id: 4, name: 'Sanya Sen', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Pending Grade)', currentProgress: 'Note-taking', doubt: null, row: 1, col: 0, grade: 'N/A', aiFeedback: '' },
-      { id: 5, name: 'Aditya Verma', status: 'distracted', lastActive: '5m ago', assignmentStatus: 'Needs Revision', currentProgress: 'Tabbed out', doubt: 'How does max pooling work?', row: 1, col: 1, grade: '12/25', aiFeedback: 'Incomplete matrix computations in section B.' },
-      { id: 6, name: 'Neha Rao', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reading PDF', doubt: null, row: 1, col: 2, grade: '24/25', aiFeedback: 'Excellent reasoning and detailed calculus proofs.' },
-      { id: 7, name: 'Vikram Singh', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Pending', currentProgress: 'Answering Poll', doubt: null, row: 2, col: 0, grade: 'N/A', aiFeedback: '' },
-      { id: 8, name: 'Ananya Goel', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reading PDF', doubt: null, row: 2, col: 1, grade: '21/25', aiFeedback: 'Solid integration steps. Keep practicing limits.' },
-      { id: 9, name: 'Kabir Mehta', status: 'distracted', lastActive: '3m ago', assignmentStatus: 'Not Started', currentProgress: 'Idle', doubt: null, row: 2, col: 2, grade: 'N/A', aiFeedback: '' },
-      { id: 10, name: 'Priya Nair', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Pending Grade)', currentProgress: 'Taking notes', doubt: null, row: 3, col: 0, grade: 'N/A', aiFeedback: '' },
-      { id: 11, name: 'Rishi Kapoor', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Pending', currentProgress: 'Reviewing slides', doubt: null, row: 3, col: 1, grade: 'N/A', aiFeedback: '' },
-      { id: 12, name: 'Tara Iyer', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Answering Poll', doubt: null, row: 3, col: 2, grade: '22/25', aiFeedback: 'Good layout and formula definitions.' },
-    ]
   })
 
   const [deployedMaterial, setDeployedMaterial] = useState(() => {
@@ -154,10 +210,18 @@ export default function Dashboard() {
       currentProgress: `Solving: ${contentSummary}`,
       status: 'focused',
     })))
-    showToast(`Worksheet from "${sourceName}" pushed to all 12 student workstations!`, 'success')
+    showToast(`Worksheet from "${sourceName}" pushed to all ${students.length} student workstations!`, 'success')
   }
 
   useEffect(() => {
+    if (!localStorage.getItem('profile_memberSince')) {
+      const date = new Date()
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const year = date.getFullYear()
+      const formattedDate = `${day}/${month}/${year}`
+      localStorage.setItem('profile_memberSince', formattedDate)
+    }
     const savedEmail = localStorage.getItem('userEmail')
     if (savedEmail) {
       setUserEmail(savedEmail)
@@ -166,11 +230,75 @@ export default function Dashboard() {
     if (savedInfo) {
       try {
         const info = JSON.parse(savedInfo)
-        if (info.name) {
+        const savedName = localStorage.getItem('profile_name')
+        if (savedName) {
+          setUserName(savedName)
+        } else if (info.name) {
           setUserName(info.name)
         }
         if (info.picture) {
           setUserPicture(info.picture)
+        }
+        if (info.token) {
+          const fetchStudents = async () => {
+            try {
+              const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+              const res = await fetch(`${API_URL}/api/students`, {
+                headers: {
+                  'Authorization': `Bearer ${info.token}`
+                }
+              })
+              if (res.ok) {
+                const data = await res.json()
+                if (Array.isArray(data)) {
+                  const mapped = data.map((st, index) => ({
+                    id: st._id,
+                    name: st.name,
+                    email: st.email || '',
+                    status: 'focused',
+                    lastActive: 'Active now',
+                    assignmentStatus: 'Not Started',
+                    currentProgress: 'Idle',
+                    doubt: null,
+                    row: Math.floor(index / 3),
+                    col: index % 3,
+                    grade: 'N/A',
+                    aiFeedback: ''
+                  }))
+                  setStudents(mapped)
+                  localStorage.setItem('real_students', JSON.stringify(mapped))
+                }
+              }
+            } catch (err) {
+              console.error('Failed to fetch students from backend:', err)
+            }
+          }
+          fetchStudents()
+
+          const fetchProfile = async () => {
+            try {
+              const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+              const res = await fetch(`${API_URL}/api/auth/profile`, {
+                headers: {
+                  'Authorization': `Bearer ${info.token}`
+                }
+              })
+              if (res.ok) {
+                const data = await res.json()
+                if (data.createdAt) {
+                  const date = new Date(data.createdAt)
+                  const day = String(date.getDate()).padStart(2, '0')
+                  const month = String(date.getMonth() + 1).padStart(2, '0')
+                  const year = date.getFullYear()
+                  const formattedDate = `${day}/${month}/${year}`
+                  localStorage.setItem('profile_memberSince', formattedDate)
+                }
+              }
+            } catch (err) {
+              console.error('Failed to fetch user profile:', err)
+            }
+          }
+          fetchProfile()
         }
       } catch (e) {
         console.error('Error parsing userInfo:', e)
@@ -180,11 +308,12 @@ export default function Dashboard() {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault()
-        setActiveTab('settings')
+        setActiveTab('profile')
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
         setActiveTab('settings')
+        setSettingsTab('appearance')
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'q') {
         e.preventDefault()
@@ -229,7 +358,85 @@ export default function Dashboard() {
   const handleLogout = () => {
     localStorage.removeItem('userEmail')
     localStorage.removeItem('userInfo')
+    localStorage.removeItem('activeTab')
+    localStorage.removeItem('settingsTab')
     navigate('/login')
+  }
+
+  const handleAddStudent = async (name, email) => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      if (!info.token) return
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/students`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${info.token}`
+        },
+        body: JSON.stringify({ name, email, classroom: 'General' })
+      })
+
+      if (res.ok) {
+        const newStudent = await res.json()
+        showToast(`Student "${name}" enrolled successfully!`, 'success')
+        
+        // Fetch updated student list
+        const reRes = await fetch(`${API_URL}/api/students`, {
+          headers: {
+            'Authorization': `Bearer ${info.token}`
+          }
+        })
+        if (reRes.ok) {
+          const reData = await reRes.json()
+          const mapped = reData.map((st, index) => ({
+            id: st._id,
+            name: st.name,
+            email: st.email || '',
+            status: 'focused',
+            lastActive: 'Active now',
+            assignmentStatus: 'Not Started',
+            currentProgress: 'Idle',
+            doubt: null,
+            row: Math.floor(index / 3),
+            col: index % 3,
+            grade: 'N/A',
+            aiFeedback: ''
+          }))
+          setStudents(mapped)
+          localStorage.setItem('real_students', JSON.stringify(mapped))
+        }
+      } else {
+        const errData = await res.json()
+        showToast(errData.message || 'Failed to add student.', 'error')
+      }
+    } catch (err) {
+      console.error(err)
+      // Offline fallback: save locally
+      setStudents(prev => {
+        const index = prev.length
+        const updated = [...prev, {
+          id: 'local-' + Date.now(),
+          name,
+          email,
+          status: 'focused',
+          lastActive: 'Active now',
+          assignmentStatus: 'Not Started',
+          currentProgress: 'Idle',
+          doubt: null,
+          row: Math.floor(index / 3),
+          col: index % 3,
+          grade: 'N/A',
+          aiFeedback: ''
+        }]
+        localStorage.setItem('real_students', JSON.stringify(updated))
+        return updated
+      })
+      showToast(`Student "${name}" added locally (Offline).`, 'success')
+    }
   }
 
   const menuItems = [
@@ -244,7 +451,17 @@ export default function Dashboard() {
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
-        return <OverviewTab setActiveTab={setActiveTab} menuItems={menuItems} userEmail={userEmail} userName={userName} />
+        return (
+          <OverviewTab
+            setActiveTab={setActiveTab}
+            menuItems={menuItems}
+            userEmail={userEmail}
+            userName={userName}
+            totalTopics={totalTopics}
+            assetsCreated={assetsCreated}
+            weeklyActivity={weeklyActivity}
+          />
+        )
       case 'flight-deck':
         return (
           <LiveFlightDeck
@@ -255,12 +472,17 @@ export default function Dashboard() {
             pushWorksheetToClass={pushWorksheetToClass}
             deployedMaterial={deployedMaterial}
             setDeployedMaterial={setDeployedMaterial}
+            handleAddStudent={handleAddStudent}
           />
         )
       case 'math-helper':
         return (
           <MathHelper
             pushWorksheetToClass={pushWorksheetToClass}
+            onProblemSolved={() => {
+              setWeeklyActivity(prev => prev + 1)
+              markToolUsed('math-helper')
+            }}
           />
         )
       case 'digitizer':
@@ -273,6 +495,11 @@ export default function Dashboard() {
             students={students}
             setStudents={setStudents}
             showToast={showToast}
+            onAssetCreated={() => {
+              setAssetsCreated(prev => prev + 1)
+              setWeeklyActivity(prev => prev + 1)
+              markToolUsed('digitizer')
+            }}
           />
         )
       case 'planner':
@@ -281,6 +508,12 @@ export default function Dashboard() {
             setDeployedMaterial={setDeployedMaterial}
             setActiveTab={setActiveTab}
             showToast={showToast}
+            onPlanGenerated={() => {
+              setTotalTopics(prev => prev + 1)
+              setAssetsCreated(prev => prev + 1)
+              setWeeklyActivity(prev => prev + 1)
+              markToolUsed('planner')
+            }}
           />
         )
       case 'visual-aids':
@@ -289,19 +522,47 @@ export default function Dashboard() {
             setDeployedMaterial={setDeployedMaterial}
             setActiveTab={setActiveTab}
             showToast={showToast}
+            onAidGenerated={() => {
+              setAssetsCreated(prev => prev + 1)
+              setWeeklyActivity(prev => prev + 1)
+              markToolUsed('visual-aids')
+            }}
           />
         )
       case 'support':
         return <SupportView showToast={showToast} />
+      case 'profile':
+        return (
+          <ProfileView
+            showToast={showToast}
+            userEmail={userEmail}
+            userName={userName}
+            totalTopics={totalTopics}
+            assetsCreated={assetsCreated}
+            totalStudents={students.length}
+            weeklyActivity={weeklyActivity}
+            onEditRedirect={() => {
+              setActiveTab('settings')
+              setSettingsTab('profile')
+            }}
+            setActiveTab={setActiveTab}
+          />
+        )
       case 'settings':
         return (
           <SettingsView
             showToast={showToast}
             userEmail={userEmail}
+            userName={userName}
+            setUserName={setUserName}
             isDarkMode={isDarkMode}
             setIsDarkMode={setIsDarkMode}
             colorTheme={colorTheme}
             setColorTheme={setColorTheme}
+            currentTab={settingsTab}
+            setCurrentTab={setSettingsTab}
+            totalTopics={totalTopics}
+            assetsCreated={assetsCreated}
           />
         )
       default:
@@ -462,7 +723,7 @@ export default function Dashboard() {
                   <div className="py-1 w-full flex flex-col">
                     <button
                       onClick={() => {
-                        setActiveTab('settings')
+                        setActiveTab('profile')
                         setIsProfileMenuOpen(false)
                       }}
                       className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-emerald-500 text-gray-700 dark:text-gray-200 hover:text-white transition-all text-xs font-semibold group cursor-pointer block text-left"
@@ -470,7 +731,7 @@ export default function Dashboard() {
                       <div className="flex items-center justify-between w-full">
                         <div className="flex items-center gap-2.5">
                           <HiOutlineUser className="text-gray-400 group-hover:text-white transition-colors" size={16} />
-                          <span>Profile</span>
+                          <span>My profile</span>
                         </div>
                         <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono font-medium group-hover:text-white/80 transition-colors">Ctrl+P</span>
                       </div>
@@ -478,6 +739,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => {
                         setActiveTab('settings')
+                        setSettingsTab('appearance')
                         setIsProfileMenuOpen(false)
                       }}
                       className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-emerald-500 text-gray-700 dark:text-gray-200 hover:text-white transition-all text-xs font-semibold group cursor-pointer block text-left"
@@ -554,8 +816,8 @@ export default function Dashboard() {
                 title="Account Settings"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {userPicture ? (
-                    <img src={userPicture} alt="Profile" className="w-9 h-9 rounded-full border border-emerald-500/20 object-cover shrink-0" />
+                  {localStorage.getItem('profile_image') || userPicture ? (
+                    <img src={localStorage.getItem('profile_image') || userPicture} alt="Profile" className="w-9 h-9 rounded-full border border-emerald-500/20 object-cover shrink-0" />
                   ) : (
                     <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center font-bold text-emerald-600 text-sm shrink-0 uppercase">
                       {(userName || userEmail).substring(0, 2).toUpperCase()}
@@ -576,11 +838,11 @@ export default function Dashboard() {
               <div className="flex justify-center">
                 <button
                   onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                  className="w-9 h-9 rounded-full overflow-hidden border border-emerald-500/20 flex items-center justify-center text-emerald-600 font-bold uppercase transition-all shrink-0 cursor-pointer bg-emerald-500/10"
+                  className="w-9 h-9 rounded-full overflow-hidden border border-emerald-500/20 flex items-center justify-center text-emerald-600 font-bold uppercase transition-all shrink-0 cursor-pointer bg-emerald-500/10 hover:bg-emerald-500/20"
                   title="Account Settings"
                 >
-                  {userPicture ? (
-                    <img src={userPicture} alt="Profile" className="w-full h-full object-cover" />
+                  {localStorage.getItem('profile_image') || userPicture ? (
+                    <img src={localStorage.getItem('profile_image') || userPicture} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     (userName || userEmail).substring(0, 2).toUpperCase()
                   )}
@@ -664,8 +926,8 @@ export default function Dashboard() {
 
                   <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-lg border border-white/10">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      {userPicture ? (
-                        <img src={userPicture} alt="Profile" className="w-8 h-8 rounded-lg border border-emerald-500/20 object-cover shrink-0" />
+                      {localStorage.getItem('profile_image') || userPicture ? (
+                        <img src={localStorage.getItem('profile_image') || userPicture} alt="Profile" className="w-8 h-8 rounded-lg border border-emerald-500/20 object-cover shrink-0" />
                       ) : (
                         <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center font-black text-emerald-400 text-sm shrink-0 uppercase">
                           {(userName || userEmail).substring(0, 2).toUpperCase()}
@@ -699,7 +961,13 @@ export default function Dashboard() {
             </button>
             <div className="hidden md:block">
               <h1 className="text-sm sm:text-base font-extrabold font-space text-white flex items-center gap-2">
-                Workspace <HiOutlineChevronRight className="text-gray-500" size={14} /> <span className="text-emerald-400">{menuItems.find(item => item.id === activeTab)?.name}</span>
+                Workspace <HiOutlineChevronRight className="text-gray-500" size={14} /> <span className="text-emerald-400">{
+                  menuItems.find(item => item.id === activeTab)?.name || 
+                  (activeTab === 'profile' ? 'My Profile' : 
+                   activeTab === 'settings' ? 'Settings' : 
+                   activeTab === 'support' ? 'Support' : 
+                   activeTab.charAt(0).toUpperCase() + activeTab.slice(1))
+                }</span>
               </h1>
             </div>
           </div>
@@ -766,7 +1034,7 @@ export default function Dashboard() {
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
             className="fixed top-5 right-5 z-50 px-5 py-3.5 bg-[#0a0f0c]/90 border border-emerald-500/40 text-emerald-300 backdrop-blur-xl rounded-xl shadow-2xl flex items-center gap-3 font-space text-sm"
           >
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_var(--color-emerald-400)]" />
             <span className="font-semibold">{toast.message}</span>
           </motion.div>
         )}
@@ -776,15 +1044,15 @@ export default function Dashboard() {
 }
 
 /* ── SPATIAL OVERVIEW TAB ── */
-function OverviewTab({ setActiveTab, menuItems, userEmail, userName }) {
+function OverviewTab({ setActiveTab, menuItems, userEmail, userName, totalTopics, assetsCreated, weeklyActivity }) {
   const gridFeatures = menuItems.filter(
     (item) => item.id !== 'overview' && item.id !== 'library' && item.id !== 'workspace'
   )
 
   const summaryStats = [
-    { label: 'Total Topics', value: 0, limit: 10, unit: 'topics', color: 'from-emerald-500 to-green-500' },
-    { label: 'Assets Created', value: 3, limit: 12, unit: 'assets', color: 'from-emerald-400 to-emerald-600' },
-    { label: 'Weekly Activity', value: 0, limit: 5, unit: 'actions', color: 'from-green-400 to-emerald-500' },
+    { label: 'Total Topics', value: totalTopics, limit: 10, unit: 'topics', color: 'from-emerald-500 to-green-500' },
+    { label: 'Assets Created', value: assetsCreated, limit: 12, unit: 'assets', color: 'from-emerald-400 to-emerald-600' },
+    { label: 'Weekly Activity', value: weeklyActivity, limit: 5, unit: 'actions', color: 'from-green-400 to-emerald-500' },
   ]
 
   return (
@@ -816,7 +1084,6 @@ function OverviewTab({ setActiveTab, menuItems, userEmail, userName }) {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {summaryStats.map((stat, i) => {
-            const percentage = (stat.value / stat.limit) * 100
             return (
               <div
                 key={i}
@@ -826,19 +1093,7 @@ function OverviewTab({ setActiveTab, menuItems, userEmail, userName }) {
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{stat.label}</span>
                   <div className="flex items-baseline gap-1.5 mt-3">
                     <span className="text-3xl sm:text-4xl font-extrabold text-white font-space">{stat.value}</span>
-                    <span className="text-xs sm:text-sm text-gray-400 font-semibold">/ {stat.limit} {stat.unit}</span>
-                  </div>
-                </div>
-
-                {/* Progress bar meter */}
-                <div className="mt-5">
-                  <div className="w-full bg-white/[0.05] rounded-full h-2 overflow-hidden border border-white/[0.01]">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${percentage}%` }}
-                      transition={{ duration: 1 }}
-                      className={`h-full rounded-full bg-gradient-to-r ${stat.color}`}
-                    />
+                    <span className="text-xs sm:text-sm text-gray-400 font-semibold">{stat.unit}</span>
                   </div>
                 </div>
               </div>
@@ -929,7 +1184,7 @@ function FeatureWorkspace({ tabId, menuItem }) {
 }
 
 
-function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, pushWorksheetToClass, deployedMaterial, setDeployedMaterial }) {
+function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, pushWorksheetToClass, deployedMaterial, setDeployedMaterial, handleAddStudent }) {
   const [activeMode, setActiveMode] = useState('presentation') // 'presentation' | 'whiteboard'
   const [brushColor, setBrushColor] = useState('#10b981')
   const [brushWidth, setBrushWidth] = useState(4)
@@ -1336,7 +1591,7 @@ function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, 
                       >
                         Clear PDF
                       </button>
-                      <span className="text-[9px] font-black tracking-widest text-[#10b981] bg-[#10b981]/10 px-2.5 py-1 rounded uppercase font-space border border-[#10b981]/20">
+                      <span className="text-[9px] font-black tracking-widest text-[var(--color-emerald-500)] bg-[var(--color-emerald-500)]/10 px-2.5 py-1 rounded uppercase font-space border border-[var(--color-emerald-500)]/20">
                         Live View
                       </span>
                     </div>
@@ -1427,6 +1682,19 @@ function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, 
                 <h3 className="text-base sm:text-lg font-bold text-white font-space">Interactive Seating Grid</h3>
                 <p className="text-xs text-gray-400 mt-0.5">Drag & drop desks to swap students. Click to inspect.</p>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const name = prompt("Enter Student's Full Name:")
+                  if (!name) return
+                  const email = prompt("Enter Student's Email:")
+                  if (!email) return
+                  handleAddStudent(name, email)
+                }}
+                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold rounded-lg transition-colors font-space shrink-0 cursor-pointer"
+              >
+                + Add Student
+              </button>
             </div>
 
             {/* Room Desk Grid */}
@@ -1621,7 +1889,7 @@ function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, 
 }
 
 /* ── INTERACTIVE PAPER DIGITIZER WORKSPACE ── */
-function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setDigitizedResult, students, setStudents, showToast }) {
+function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setDigitizedResult, students, setStudents, showToast, onAssetCreated }) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [isDigitizing, setIsDigitizing] = useState(false)
   const [digitizerMode, setDigitizerMode] = useState('upload') // 'upload' | 'camera'
@@ -1678,6 +1946,7 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
         ]
       })
       setIsDigitizing(false)
+      if (onAssetCreated) onAssetCreated()
     }, 2000)
   }
 
@@ -1731,6 +2000,7 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
       })
       setIsScanning(false)
       showToast(`Marks (${chosenScore}) filled in Gradebook for ${targetStudent ? targetStudent.name : 'student'}!`, 'success')
+      if (onAssetCreated) onAssetCreated()
     }, 2500)
   }
 
@@ -2046,7 +2316,7 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
 }
 
 /* ── MATH HELPER WORKSPACE ── */
-export function MathHelper({ pushWorksheetToClass }) {
+export function MathHelper({ pushWorksheetToClass, onProblemSolved }) {
   const [problem, setProblem] = useState('')
   const [selectedTopic, setSelectedTopic] = useState('Calculus')
   const [solutionSteps, setSolutionSteps] = useState(null)
@@ -2076,6 +2346,7 @@ export function MathHelper({ pushWorksheetToClass }) {
       
       setSolutionSteps(steps)
       setIsSolving(false)
+      if (onProblemSolved) onProblemSolved()
     }, 1500)
   }
 
@@ -2228,7 +2499,7 @@ function CustomDropdown({ label, value, options, onChange, placeholder }) {
   const selectedOption = options.find(opt => opt.value === value)
 
   return (
-    <div className="relative space-y-1.5 flex-1 text-left" ref={dropdownRef}>
+    <div className={`relative space-y-1.5 flex-1 text-left ${isOpen ? 'z-40' : 'z-10'}`} ref={dropdownRef}>
       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-space">{label}</label>
       <button
         type="button"
@@ -2267,7 +2538,7 @@ function CustomDropdown({ label, value, options, onChange, placeholder }) {
             >
               <span>{opt.label}</span>
               {value === opt.value && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_var(--color-emerald-400)]" />
               )}
             </button>
           ))}
@@ -2277,7 +2548,7 @@ function CustomDropdown({ label, value, options, onChange, placeholder }) {
   )
 }
 
-export function LessonPlanner({ setDeployedMaterial, setActiveTab, showToast }) {
+export function LessonPlanner({ setDeployedMaterial, setActiveTab, showToast, onPlanGenerated }) {
   const [grade, setGrade] = useState('')
 
   const subjectsByGrade = {
@@ -2384,6 +2655,7 @@ export function LessonPlanner({ setDeployedMaterial, setActiveTab, showToast }) 
       })
       setIsGenerating(false)
       showToast('AI Lesson Plan generated successfully!', 'success')
+      if (onPlanGenerated) onPlanGenerated()
     }, 2000)
   }
 
@@ -2436,16 +2708,16 @@ export function LessonPlanner({ setDeployedMaterial, setActiveTab, showToast }) 
         <div className="space-y-4">
           <div className="flex gap-4">
             <CustomDropdown
-              label="Subject"
-              value={subject}
-              options={subjectOptions}
-              onChange={setSubject}
-            />
-            <CustomDropdown
               label="Grade Level"
               value={grade}
               options={gradeOptions}
               onChange={handleGradeChange}
+            />
+            <CustomDropdown
+              label="Subject"
+              value={subject}
+              options={subjectOptions}
+              onChange={setSubject}
             />
           </div>
 
@@ -2575,7 +2847,7 @@ export function LessonPlanner({ setDeployedMaterial, setActiveTab, showToast }) 
 }
 
 /* ── VISUAL AIDS WORKSPACE ── */
-export function VisualAids({ setDeployedMaterial, setActiveTab, showToast }) {
+export function VisualAids({ setDeployedMaterial, setActiveTab, showToast, onAidGenerated }) {
   const [prompt, setPrompt] = useState('')
   const [aidType, setAidType] = useState('diagram') // 'diagram' | 'chart'
   const [isGenerating, setIsGenerating] = useState(false)
@@ -2614,6 +2886,7 @@ export function VisualAids({ setDeployedMaterial, setActiveTab, showToast }) {
       }
       setIsGenerating(false)
       showToast('Visual aid successfully generated!', 'success')
+      if (onAidGenerated) onAidGenerated()
     }, 2000)
   }
 
@@ -2927,7 +3200,7 @@ export function SupportView({ showToast }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
           {/* Email Support */}
           <div className="flex items-center gap-4.5 p-6 border border-white/[0.08] bg-[#0c0d0d] rounded-2xl shadow-xl">
-            <HiOutlineMail className="text-[#82e22c] shrink-0" size={32} />
+            <HiOutlineMail className="text-[var(--color-emerald-500)] shrink-0" size={32} />
             <div className="flex flex-col">
               <span className="text-base font-bold text-white">Email Support</span>
               <span className="text-sm text-gray-400 mt-0.5 font-medium">info@acharya.ai</span>
@@ -2936,7 +3209,7 @@ export function SupportView({ showToast }) {
 
           {/* Phone Support */}
           <div className="flex items-center gap-4.5 p-6 border border-white/[0.08] bg-[#0c0d0d] rounded-2xl shadow-xl">
-            <HiOutlinePhone className="text-[#82e22c] shrink-0" size={32} />
+            <HiOutlinePhone className="text-[var(--color-emerald-500)] shrink-0" size={32} />
             <div className="flex flex-col">
               <span className="text-base font-bold text-white">Phone Support</span>
               <span className="text-sm text-gray-400 mt-0.5 font-medium">+91 98765 43210</span>
@@ -2948,47 +3221,310 @@ export function SupportView({ showToast }) {
   )
 }
 
-export function SettingsView({ showToast, userEmail, isDarkMode, setIsDarkMode, colorTheme, setColorTheme }) {
-  const [currentTab, setCurrentTab] = useState('profile')
-  const [profileImage, setProfileImage] = useState(null)
-  const [coverImage, setCoverImage] = useState(null)
+export function ProfileView({ userEmail, userName, showToast, totalTopics = 0, assetsCreated = 0, totalStudents = 12, weeklyActivity = 0, onEditRedirect, setActiveTab }) {
+  const profileImage = localStorage.getItem('profile_image') || null
+  const coverImage = localStorage.getItem('profile_cover') || null
+  const profileName = localStorage.getItem('profile_name') || userName || userEmail
+  
+  const schoolName = localStorage.getItem('profile_schoolName') || ''
+  const subjectsTaught = localStorage.getItem('profile_subjectsTaught') || ''
+  const experience = localStorage.getItem('profile_experience') || ''
+  const qualification = localStorage.getItem('profile_qualification') || ''
+  const memberSince = localStorage.getItem('profile_memberSince') || (() => {
+    const date = new Date()
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+    return `${day}/${month}/${year}`
+  })()
+  const aboutMe = localStorage.getItem('profile_aboutMe') || 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.'
+
+  const usedAiToolsCount = (() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('used_ai_tools') || '[]')
+      const inferred = new Set(list)
+      if (totalTopics > 0) inferred.add('planner')
+      if (assetsCreated > totalTopics) inferred.add('digitizer')
+      return inferred.size
+    } catch (e) {
+      return 0
+    }
+  })()
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col space-y-6 w-full max-w-5xl mx-auto pb-12 text-left"
+    >
+      {/* Header */}
+      <div className="space-y-1">
+        <h2 className="text-3xl font-extrabold font-space tracking-tight text-white leading-tight">My Profile</h2>
+        <p className="text-gray-400 text-sm font-semibold">View your public profile details and statistics.</p>
+      </div>
+
+      {/* Profile Details Card */}
+      <div className="border border-white/[0.06] bg-[#070a08]/40 rounded-2xl p-8 shadow-xl backdrop-blur-md">
+        <div className="space-y-8">
+          {/* Profile Header Card */}
+          <div className="relative rounded-3xl overflow-hidden border border-white/[0.08] bg-[#0c0d0d] pb-6">
+            {/* Cover Image / Gradient */}
+            <div 
+              className="relative w-full h-44 sm:h-52 rounded-t-3xl overflow-hidden border-b border-white/[0.04]"
+              style={{
+                background: 'linear-gradient(to right, var(--theme-dark-accent, #021c0e), var(--theme-cta-from, #0c1c13), var(--theme-glow, #10b981))'
+              }}
+            >
+              {coverImage ? (
+                <img src={coverImage} alt="Cover" className="w-full h-full object-cover" />
+              ) : (
+                <div 
+                  className="w-full h-full opacity-80"
+                  style={{
+                    background: 'linear-gradient(to right, var(--theme-dark-accent, #021c0e), var(--theme-cta-from, #0c1c13), var(--theme-glow, #10b981))'
+                  }}
+                />
+              )}
+            </div>
+            
+            {/* Profile Photo Overlapping */}
+            <div className="absolute left-6 sm:left-8 top-[176px] sm:top-[208px] -translate-y-1/2 z-10">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-[3px] border-[#070a08] bg-[#1a0f12] flex items-center justify-center shadow-2xl relative select-none">
+                {profileImage ? (
+                  <img src={profileImage} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <span className="text-3xl sm:text-4xl font-extrabold text-[var(--color-emerald-400)]">
+                    {(profileName || 'E').charAt(0).toUpperCase()}
+                  </span>
+                )}
+                {/* Active Status Badge */}
+                <span className="absolute bottom-0.5 right-0.5 w-4.5 h-4.5 rounded-full bg-emerald-500 border-[3px] border-[#070a08] shadow-md" />
+              </div>
+            </div>
+
+            {/* Profile Bio Details Row */}
+            <div className="pt-16 sm:pt-6 px-6 sm:px-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="space-y-1 min-w-0 sm:pl-32">
+                <h2 className="text-xl sm:text-2xl font-bold text-white font-space leading-tight truncate mb-0.5">
+                  {profileName}
+                </h2>
+                <div className="text-xs text-gray-400 font-medium leading-none mb-2">
+                  {userEmail}
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+                  <HiOutlineAcademicCap className="text-gray-500 shrink-0" size={14} />
+                  <span>{schoolName || 'Institution not set'}</span>
+                </div>
+                <div className="pt-0.5">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 uppercase tracking-wider">
+                    Teacher
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={onEditRedirect}
+                className="flex items-center gap-1.5 px-4.5 py-2.5 bg-black/60 hover:bg-black border border-white/[0.08] hover:border-white/20 text-white rounded-xl text-xs font-bold transition-all duration-300 shadow-md cursor-pointer font-space"
+              >
+                <HiOutlinePencil size={13} />
+                <span>Edit Profile</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Main Grid: Left and Right Columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* Left Column */}
+            <div className="lg:col-span-8 flex flex-col gap-6">
+              
+              {/* About Card */}
+              <div className="border border-white/[0.08] bg-[#0c0d0d] rounded-2xl p-6 sm:p-7 shadow-md flex flex-col">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-1.5 h-5 bg-indigo-500 rounded-full" />
+                  <h3 className="font-space text-sm font-bold text-white uppercase tracking-wider">ABOUT</h3>
+                </div>
+                <p className="text-gray-400 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap">
+                  {aboutMe}
+                </p>
+              </div>
+
+              {/* Usage Overview Card */}
+              <div className="border border-white/[0.08] bg-[#0c0d0d] rounded-2xl p-6 sm:p-7 shadow-md flex flex-col">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-1.5 h-5 bg-indigo-500 rounded-full" />
+                  <h3 className="font-space text-base font-bold text-white">Usage Overview</h3>
+                </div>
+                
+                {/* 4 Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  
+                  {/* Card 1: AI Tools Used */}
+                  <div className="border border-white/[0.04] bg-[#050706] p-5 rounded-2xl flex flex-col shadow-md">
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <span className="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                        <HiOutlineUser size={15} />
+                      </span>
+                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">AI Tools Used</span>
+                    </div>
+                    <div className="text-3xl font-extrabold text-white mt-3 font-space">{usedAiToolsCount}</div>
+                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1">This month</div>
+                  </div>
+
+                  {/* Card 2: Time Saved */}
+                  <div className="border border-white/[0.04] bg-[#050706] p-5 rounded-2xl flex flex-col shadow-md">
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <span className="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                        <HiOutlineClock size={15} />
+                      </span>
+                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Time Saved</span>
+                    </div>
+                    <div className="text-3xl font-extrabold text-white mt-3 font-space">
+                      {((totalTopics * 3) + (assetsCreated * 2))}h
+                    </div>
+                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1">Estimated</div>
+                  </div>
+
+                  {/* Card 3: Resources */}
+                  <div className="border border-white/[0.04] bg-[#050706] p-5 rounded-2xl flex flex-col shadow-md">
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <span className="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                        <HiOutlineDocumentText size={15} />
+                      </span>
+                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Resources</span>
+                    </div>
+                    <div className="text-3xl font-extrabold text-white mt-3 font-space">
+                      {assetsCreated}
+                    </div>
+                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1">Created</div>
+                  </div>
+
+                  {/* Card 4: AI Tokens */}
+                  <div className="border border-white/[0.04] bg-[#050706] p-5 rounded-2xl flex flex-col shadow-md">
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <span className="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                        <HiOutlineLightningBolt size={15} />
+                      </span>
+                      <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">AI Tokens</span>
+                    </div>
+                    <div className="text-3xl font-extrabold text-white mt-3 font-space">
+                      {((totalTopics * 15) + (assetsCreated * 8)).toFixed(1)}k
+                    </div>
+                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1">Processed</div>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+
+            {/* Right Column */}
+            <div className="lg:col-span-4 flex flex-col gap-6">
+              
+              {/* Details Card */}
+              <div className="border border-white/[0.08] bg-[#0c0d0d] rounded-2xl p-6 sm:p-7 shadow-md flex flex-col">
+                <div className="flex items-center gap-2 mb-6">
+                  <span className="w-1.5 h-5 bg-indigo-500 rounded-full" />
+                  <h3 className="font-space text-base font-bold text-white">Details</h3>
+                </div>
+                
+                <div className="space-y-5">
+                  {/* Institution */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/5 border border-indigo-500/15 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5">
+                      <HiOutlineAcademicCap size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Institution</span>
+                      <span className="text-sm font-semibold text-white mt-0.5">{schoolName || 'Not specified'}</span>
+                    </div>
+                  </div>
+
+                  {/* Subjects */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/5 border border-indigo-500/15 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5">
+                      <HiOutlineBookOpen size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Subjects</span>
+                      <span className="text-sm font-semibold text-white mt-0.5">{subjectsTaught || 'Not specified'}</span>
+                    </div>
+                  </div>
+
+                  {/* Experience */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/5 border border-indigo-500/15 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5">
+                      <HiOutlineStar size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Experience</span>
+                      <span className="text-sm font-semibold text-white mt-0.5">{experience || 'Not specified'}</span>
+                    </div>
+                  </div>
+
+                  {/* Qualification */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/5 border border-indigo-500/15 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5">
+                      <HiOutlineAcademicCap size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Qualification</span>
+                      <span className="text-sm font-semibold text-white mt-0.5">{qualification || 'Not specified'}</span>
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/5 border border-indigo-500/15 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5">
+                      <HiOutlineMail size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Email</span>
+                      <span className="text-sm font-semibold text-white mt-0.5 truncate max-w-[180px]">{userEmail || 'Not specified'}</span>
+                    </div>
+                  </div>
+
+                  {/* Member Since */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/5 border border-indigo-500/15 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5">
+                      <HiOutlineCalendar size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Member Since</span>
+                      <span className="text-sm font-semibold text-white mt-0.5">{memberSince}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+export function EditProfileForm({ userEmail, userName, setUserName, showToast }) {
+  const [profileImage, setProfileImage] = useState(() => localStorage.getItem('profile_image') || null)
+  const [coverImage, setCoverImage] = useState(() => localStorage.getItem('profile_cover') || null)
   const profileInputRef = useRef(null)
   const coverInputRef = useRef(null)
-
-  const handleMouseMove = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    e.currentTarget.style.setProperty('--x', `${x}px`)
-    e.currentTarget.style.setProperty('--y', `${y}px`)
-  }
-
-  // Profile fields state
-  const [schoolName, setSchoolName] = useState('')
-  const [subjectsTaught, setSubjectsTaught] = useState('')
-  const [experience, setExperience] = useState('')
-
-  // Sub-states for various tabs
-  const [defaultLanguage, setDefaultLanguage] = useState('English')
-  const [defaultGradeLevel, setDefaultGradeLevel] = useState('Grade 8')
-  const [aiCreativity, setAiCreativity] = useState('Balanced')
-  const [isLangOpen, setIsLangOpen] = useState(false)
-  const [isCreativityOpen, setIsCreativityOpen] = useState(false)
-  const [customInstructions, setCustomInstructions] = useState('')
-  const [defaultSubject, setDefaultSubject] = useState('Mathematics')
-  const [accountEmail, setAccountEmail] = useState('educator@acharya.ai')
-  const [autoSaveContent, setAutoSaveContent] = useState(true)
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-
-  const tabs = [
-    { id: 'profile', name: 'Profile', icon: HiOutlineUser },
-    { id: 'appearance', name: 'Appearance', icon: HiOutlineColorSwatch },
-    { id: 'ai', name: 'AI Assistant', icon: HiOutlineSparkles },
-    { id: 'workspace', name: 'Workspace', icon: HiOutlineFolder },
-    { id: 'account', name: 'Account', icon: HiOutlineKey },
-    { id: 'help', name: 'Help', icon: HiOutlineQuestionMarkCircle }
-  ]
+  
+  const [fullName, setFullName] = useState(() => localStorage.getItem('profile_name') || userName || '')
+  const [schoolName, setSchoolName] = useState(() => localStorage.getItem('profile_schoolName') || '')
+  const [subjectsTaught, setSubjectsTaught] = useState(() => localStorage.getItem('profile_subjectsTaught') || '')
+  const [experience, setExperience] = useState(() => localStorage.getItem('profile_experience') || '')
+  const [qualification, setQualification] = useState(() => localStorage.getItem('profile_qualification') || '')
+  const [memberSince, setMemberSince] = useState(() => localStorage.getItem('profile_memberSince') || (() => {
+    const date = new Date()
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+    return `${day}/${month}/${year}`
+  })())
+  const [aboutMe, setAboutMe] = useState(() => localStorage.getItem('profile_aboutMe') || 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.')
 
   const handleFileClick = (type) => {
     if (type === 'profile' && profileInputRef.current) {
@@ -3005,15 +3541,260 @@ export function SettingsView({ showToast, userEmail, isDarkMode, setIsDarkMode, 
       reader.onload = (event) => {
         if (type === 'profile') {
           setProfileImage(event.target.result)
+          localStorage.setItem('profile_image', event.target.result)
           showToast('Profile photo updated successfully!', 'success')
         } else {
           setCoverImage(event.target.result)
+          localStorage.setItem('profile_cover', event.target.result)
           showToast('Cover image updated successfully!', 'success')
         }
       }
       reader.readAsDataURL(file)
     }
   }
+
+  const handleSaveProfile = () => {
+    localStorage.setItem('profile_name', fullName)
+    localStorage.setItem('profile_schoolName', schoolName)
+    localStorage.setItem('profile_subjectsTaught', subjectsTaught)
+    localStorage.setItem('profile_experience', experience)
+    localStorage.setItem('profile_qualification', qualification)
+    localStorage.setItem('profile_memberSince', memberSince)
+    localStorage.setItem('profile_aboutMe', aboutMe)
+    if (setUserName) {
+      setUserName(fullName)
+    }
+    showToast('Profile updated successfully!', 'success')
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-xl font-bold font-space text-white">Edit Profile</h3>
+        <p className="text-xs text-gray-500 mt-1">Update your profile photo, cover image, and description details.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mt-6">
+        {/* Profile Photo */}
+        <div className="md:col-span-4 flex flex-col">
+          <label className="text-xs font-bold text-gray-400 mb-2">Profile Photo</label>
+          <div
+            onClick={() => handleFileClick('profile')}
+            className="flex-grow min-h-[220px] border-2 border-dashed border-white/[0.08] bg-[#0c0f0d] rounded-2xl flex flex-col items-center justify-center p-6 cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/[0.01] transition-all group"
+          >
+            {profileImage ? (
+              <div className="relative group" onClick={(e) => e.stopPropagation()}>
+                <img src={profileImage} alt="Profile" className="w-28 h-28 rounded-full object-cover border border-white/10" />
+                <div 
+                  onClick={() => handleFileClick('profile')}
+                  className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs text-white font-bold transition-all cursor-pointer"
+                >
+                  Change
+                </div>
+              </div>
+            ) : (
+              <>
+                <HiOutlineCloudUpload size={28} className="text-gray-500 group-hover:text-emerald-400 transition-colors" />
+                <span className="text-xs text-gray-400 mt-3 font-semibold group-hover:text-white transition-colors">Click or drag to upload</span>
+              </>
+            )}
+            <input
+              type="file"
+              ref={profileInputRef}
+              className="hidden"
+              accept="image/*"
+              onChange={(e) => handleImageUpload(e, 'profile')}
+            />
+          </div>
+        </div>
+
+        {/* Cover Image */}
+        <div className="md:col-span-8 flex flex-col">
+          <label className="text-xs font-bold text-gray-400 mb-2">Cover Image</label>
+          <div
+            onClick={() => handleFileClick('cover')}
+            className="flex-grow min-h-[220px] border-2 border-dashed border-white/[0.08] bg-[#0c0f0d] rounded-2xl flex flex-col items-center justify-center p-6 cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/[0.01] transition-all group"
+          >
+            {coverImage ? (
+              <div className="relative w-full h-[180px] group" onClick={(e) => e.stopPropagation()}>
+                <img src={coverImage} alt="Cover" className="w-full h-full rounded-xl object-cover border border-white/10" />
+                <div 
+                  onClick={() => handleFileClick('cover')}
+                  className="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs text-white font-bold transition-all cursor-pointer"
+                >
+                  Change Image
+                </div>
+              </div>
+            ) : (
+              <>
+                <HiOutlineCloudUpload size={28} className="text-gray-500 group-hover:text-emerald-400 transition-colors" />
+                <span className="text-xs text-gray-400 mt-3 font-semibold group-hover:text-white transition-colors">Click or drag to upload</span>
+              </>
+            )}
+            <input
+              type="file"
+              ref={coverInputRef}
+              className="hidden"
+              accept="image/*"
+              onChange={(e) => handleImageUpload(e, 'cover')}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Profile Information Fields */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 pt-6 border-t border-white/[0.06]">
+        {/* Full Name */}
+        <div className="flex flex-col">
+          <label className="text-xs font-bold text-gray-400 mb-2">Full Name</label>
+          <input
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Your Full Name"
+            className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium placeholder-gray-500"
+          />
+        </div>
+
+        {/* Email Address */}
+        <div className="flex flex-col">
+          <label className="text-xs font-bold text-gray-400 mb-2">Email Address</label>
+          <input
+            type="email"
+            value={userEmail}
+            disabled
+            placeholder="Your email address"
+            className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-gray-400 cursor-not-allowed opacity-60 font-medium placeholder-gray-500"
+          />
+        </div>
+
+        {/* School Name */}
+        <div className="flex flex-col">
+          <label className="text-xs font-bold text-gray-400 mb-2">School Name</label>
+          <input
+            type="text"
+            value={schoolName}
+            onChange={(e) => setSchoolName(e.target.value)}
+            placeholder="e.g., Delhi Public School"
+            className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium placeholder-gray-500"
+          />
+        </div>
+
+        {/* Subjects Taught */}
+        <div className="flex flex-col">
+          <label className="text-xs font-bold text-gray-400 mb-2">Subjects Taught</label>
+          <input
+            type="text"
+            value={subjectsTaught}
+            onChange={(e) => setSubjectsTaught(e.target.value)}
+            placeholder="e.g., Mathematics, Science"
+            className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium placeholder-gray-500"
+          />
+        </div>
+
+        {/* Years of Experience */}
+        <div className="flex flex-col">
+          <label className="text-xs font-bold text-gray-400 mb-2">Years of Experience</label>
+          <input
+            type="text"
+            value={experience}
+            onChange={(e) => setExperience(e.target.value)}
+            placeholder="e.g., 5 years"
+            className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium placeholder-gray-500"
+          />
+        </div>
+
+        {/* Qualification */}
+        <div className="flex flex-col">
+          <label className="text-xs font-bold text-gray-400 mb-2">Qualification</label>
+          <input
+            type="text"
+            value={qualification}
+            onChange={(e) => setQualification(e.target.value)}
+            placeholder="e.g., B.Ed, M.Sc in Mathematics"
+            className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium placeholder-gray-500"
+          />
+        </div>
+
+        {/* Member Since */}
+        <div className="flex flex-col">
+          <label className="text-xs font-bold text-gray-400 mb-2">Member Since</label>
+          <input
+            type="text"
+            value={memberSince}
+            disabled
+            className="bg-[#050706]/50 border border-white/[0.04] rounded-xl px-4 py-3.5 text-sm text-gray-400 font-medium cursor-not-allowed"
+          />
+        </div>
+
+        {/* About Me */}
+        <div className="flex flex-col md:col-span-2">
+          <label className="text-xs font-bold text-gray-400 mb-2">About Me</label>
+          <textarea
+            value={aboutMe}
+            onChange={(e) => setAboutMe(e.target.value)}
+            placeholder="Write a brief bio about your teaching journey..."
+            rows={4}
+            className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium placeholder-gray-500 resize-none w-full"
+          />
+        </div>
+      </div>
+
+      {/* Editing Action Buttons */}
+      <div className="flex justify-end gap-3 pt-6 border-t border-white/[0.06] mt-4">
+        <button
+          type="button"
+          onClick={handleSaveProfile}
+          className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold rounded-lg text-xs tracking-wide transition-all cursor-pointer"
+        >
+          Save Profile
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function SettingsView({ 
+  showToast, 
+  userEmail, 
+  userName,
+  setUserName,
+  isDarkMode, 
+  setIsDarkMode, 
+  colorTheme, 
+  setColorTheme,
+  currentTab,
+  setCurrentTab,
+  totalTopics,
+  assetsCreated
+}) {
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    e.currentTarget.style.setProperty('--x', `${x}px`)
+    e.currentTarget.style.setProperty('--y', `${y}px`)
+  }
+
+  // Sub-states for various tabs
+  const [defaultLanguage, setDefaultLanguage] = useState('English')
+  const [defaultGradeLevel, setDefaultGradeLevel] = useState('Grade 8')
+  const [aiCreativity, setAiCreativity] = useState('Balanced')
+  const [isLangOpen, setIsLangOpen] = useState(false)
+  const [isCreativityOpen, setIsCreativityOpen] = useState(false)
+  const [customInstructions, setCustomInstructions] = useState('')
+  const [defaultSubject, setDefaultSubject] = useState('Mathematics')
+  const [accountEmail, setAccountEmail] = useState('educator@acharya.ai')
+  const [autoSaveContent, setAutoSaveContent] = useState(true)
+
+  const tabs = [
+    { id: 'profile', name: 'Profile', icon: HiOutlineUser },
+    { id: 'appearance', name: 'Appearance', icon: HiOutlineColorSwatch },
+    { id: 'ai', name: 'AI Assistant', icon: HiOutlineSparkles },
+    { id: 'workspace', name: 'Workspace', icon: HiOutlineFolder },
+    { id: 'account', name: 'Account', icon: HiOutlineKey },
+    { id: 'help', name: 'Help', icon: HiOutlineQuestionMarkCircle }
+  ]
 
   const handleSaveSettings = () => {
     if (userEmail && userEmail !== 'educator@acharya.ai') {
@@ -3061,124 +3842,15 @@ export function SettingsView({ showToast, userEmail, isDarkMode, setIsDarkMode, 
 
       {/* Tab panel container */}
       <div onMouseMove={handleMouseMove} className="premium-glow-large border border-white/[0.06] bg-[#070a08]/40 rounded-2xl p-8 text-left shadow-xl backdrop-blur-md min-h-[400px] flex flex-col justify-between">
-        
+
         {/* PROFILE TAB */}
         {currentTab === 'profile' && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-xl font-bold font-space text-white">Public Profile</h3>
-              <p className="text-xs text-gray-500 mt-1">This information will be displayed on your profile page.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mt-6">
-              {/* Profile Photo */}
-              <div className="md:col-span-4 flex flex-col">
-                <label className="text-xs font-bold text-gray-400 mb-2">Profile Photo</label>
-                <div
-                  onClick={() => handleFileClick('profile')}
-                  className="flex-1 min-h-[220px] border-2 border-dashed border-white/[0.08] bg-[#0c0f0d] rounded-2xl flex flex-col items-center justify-center p-6 cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/[0.01] transition-all group"
-                >
-                  {profileImage ? (
-                    <div className="relative group">
-                      <img src={profileImage} alt="Profile" className="w-28 h-28 rounded-full object-cover border border-white/10" />
-                      <div className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs text-white font-bold transition-all">Change</div>
-                    </div>
-                  ) : (
-                    <>
-                      <HiOutlineCloudUpload size={28} className="text-gray-500 group-hover:text-emerald-400 transition-colors" />
-                      <span className="text-xs text-gray-400 mt-3 font-semibold group-hover:text-white transition-colors">Click or drag to upload</span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    ref={profileInputRef}
-                    className="hidden"
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(e, 'profile')}
-                  />
-                </div>
-              </div>
-
-              {/* Cover Image */}
-              <div className="md:col-span-8 flex flex-col">
-                <label className="text-xs font-bold text-gray-400 mb-2">Cover Image</label>
-                <div
-                  onClick={() => handleFileClick('cover')}
-                  className="flex-grow min-h-[220px] border-2 border-dashed border-white/[0.08] bg-[#0c0f0d] rounded-2xl flex flex-col items-center justify-center p-6 cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/[0.01] transition-all group"
-                >
-                  {coverImage ? (
-                    <div className="relative w-full h-[180px] group">
-                      <img src={coverImage} alt="Cover" className="w-full h-full rounded-xl object-cover border border-white/10" />
-                      <div className="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs text-white font-bold transition-all">Change Image</div>
-                    </div>
-                  ) : (
-                    <>
-                      <HiOutlineCloudUpload size={28} className="text-gray-500 group-hover:text-emerald-400 transition-colors" />
-                      <span className="text-xs text-gray-400 mt-3 font-semibold group-hover:text-white transition-colors">Click or drag to upload</span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    ref={coverInputRef}
-                    className="hidden"
-                    accept="image/*"
-                    onChange={(e) => handleImageUpload(e, 'cover')}
-                  />
-            </div>
-          </div>
-        </div>
-
-            {/* Profile Information Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 pt-6 border-t border-white/[0.06]">
-              {/* Full Name */}
-              <div className="flex flex-col">
-                <label className="text-xs font-bold text-gray-400 mb-2">Full Name</label>
-                <input
-                  type="text"
-                  value={userEmail}
-                  disabled
-                  placeholder="Your email address"
-                  className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-gray-400 cursor-not-allowed opacity-60 font-medium placeholder-gray-500"
-                />
-              </div>
-
-              {/* School Name */}
-              <div className="flex flex-col">
-                <label className="text-xs font-bold text-gray-400 mb-2">School Name</label>
-                <input
-                  type="text"
-                  value={schoolName}
-                  onChange={(e) => setSchoolName(e.target.value)}
-                  placeholder="e.g., Delhi Public School"
-                  className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium placeholder-gray-500"
-                />
-              </div>
-
-              {/* Subjects Taught */}
-              <div className="flex flex-col">
-                <label className="text-xs font-bold text-gray-400 mb-2">Subjects Taught</label>
-                <input
-                  type="text"
-                  value={subjectsTaught}
-                  onChange={(e) => setSubjectsTaught(e.target.value)}
-                  placeholder="e.g., Mathematics, Science"
-                  className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium placeholder-gray-500"
-                />
-              </div>
-
-              {/* Years of Experience */}
-              <div className="flex flex-col">
-                <label className="text-xs font-bold text-gray-400 mb-2">Years of Experience</label>
-                <input
-                  type="text"
-                  value={experience}
-                  onChange={(e) => setExperience(e.target.value)}
-                  placeholder="e.g., 5 years"
-                  className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium placeholder-gray-500"
-                />
-              </div>
-            </div>
-          </div>
+          <EditProfileForm
+            showToast={showToast}
+            userEmail={userEmail}
+            userName={userName}
+            setUserName={setUserName}
+          />
         )}
 
         {/* APPEARANCE TAB */}
@@ -3374,10 +4046,12 @@ export function SettingsView({ showToast, userEmail, isDarkMode, setIsDarkMode, 
             </div>
           </div>
         )}
-
         {/* AI ASSISTANT TAB */}
         {currentTab === 'ai' && (
-          <div className="space-y-6">
+          <div 
+            className="space-y-6 relative" 
+            style={{ zIndex: (isLangOpen || isCreativityOpen) ? 20 : undefined }}
+          >
             <div>
               <h3 className="text-xl font-bold font-space text-white">AI Assistant</h3>
               <p className="text-xs text-gray-500 mt-1">Customize the default behavior of the AI assistant.</p>
@@ -3385,7 +4059,11 @@ export function SettingsView({ showToast, userEmail, isDarkMode, setIsDarkMode, 
 
             <div className="space-y-4 mt-6">
               {/* Default Language Row */}
-              <div onMouseMove={handleMouseMove} className="premium-glow-hover border border-white/[0.08] bg-[#0c0d0d] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div 
+                onMouseMove={handleMouseMove} 
+                className="premium-glow-hover border border-white/[0.08] bg-[#0c0d0d] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative"
+                style={{ zIndex: isLangOpen ? 30 : undefined }}
+              >
                 <div>
                   <span className="text-sm font-bold text-white">Default Language</span>
                   <p className="text-xs text-gray-500 mt-1">Set the default language for generated content.</p>
@@ -3435,7 +4113,11 @@ export function SettingsView({ showToast, userEmail, isDarkMode, setIsDarkMode, 
               </div>
 
               {/* AI Creativity Level Row */}
-              <div onMouseMove={handleMouseMove} className="premium-glow-hover border border-white/[0.08] bg-[#0c0d0d] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div 
+                onMouseMove={handleMouseMove} 
+                className="premium-glow-hover border border-white/[0.08] bg-[#0c0d0d] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative"
+                style={{ zIndex: isCreativityOpen ? 30 : undefined }}
+              >
                 <div>
                   <span className="text-sm font-bold text-white">AI Creativity Level</span>
                   <p className="text-xs text-gray-500 mt-1">Control the creativity of the AI responses.</p>
@@ -3524,7 +4206,7 @@ export function SettingsView({ showToast, userEmail, isDarkMode, setIsDarkMode, 
           <div className="space-y-6">
             <div>
               <h3 className="text-xl font-bold font-space text-white">Account & Security</h3>
-              <p className="text-xs text-gray-500 mt-1">Manage your account password.</p>
+              <p className="text-xs text-gray-500 mt-1">Manage your account email and security settings.</p>
             </div>
 
             <div className="space-y-4 mt-6">
@@ -3537,51 +4219,6 @@ export function SettingsView({ showToast, userEmail, isDarkMode, setIsDarkMode, 
                   disabled
                   className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-gray-400 cursor-not-allowed opacity-60 font-medium placeholder-gray-500"
                 />
-              </div>
-
-              {/* New Password */}
-              <div className="flex flex-col">
-                <label className="text-xs font-bold text-gray-400 mb-2">New Password</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium placeholder-gray-500"
-                />
-              </div>
-
-              {/* Confirm Password */}
-              <div className="flex flex-col">
-                <label className="text-xs font-bold text-gray-400 mb-2">Confirm Password</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="bg-[#050706] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 font-medium placeholder-gray-500"
-                />
-              </div>
-
-              {/* Change Password Button */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (newPassword && newPassword === confirmPassword) {
-                      showToast('Password changed successfully!', 'success')
-                      setNewPassword('')
-                      setConfirmPassword('')
-                    } else if (newPassword !== confirmPassword) {
-                      showToast('Passwords do not match!', 'error')
-                    } else {
-                      showToast('Please enter a new password.', 'warning')
-                    }
-                  }}
-                  className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold rounded-lg text-xs tracking-wide transition-colors cursor-pointer"
-                >
-                  Change Password
-                </button>
               </div>
             </div>
 
@@ -3680,14 +4317,19 @@ export function SettingsView({ showToast, userEmail, isDarkMode, setIsDarkMode, 
         )}
 
         {/* Action Bar */}
-        <div className="mt-8 pt-6 border-t border-white/[0.06] flex justify-end gap-3">
-          <button
-            onClick={handleSaveSettings}
-            className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold rounded-lg text-sm tracking-wide transition-colors cursor-pointer"
+        {currentTab !== 'profile' && (
+          <div 
+            className="mt-8 pt-6 border-t border-white/[0.06] flex justify-end gap-3 relative"
+            style={{ zIndex: 1 }}
           >
-            Save All Settings
-          </button>
-        </div>
+            <button
+              onClick={handleSaveSettings}
+              className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold rounded-lg text-sm tracking-wide transition-colors cursor-pointer"
+            >
+              Save All Settings
+            </button>
+          </div>
+        )}
       </div>
     </motion.div>
   )

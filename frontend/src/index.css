@@ -202,7 +202,7 @@
 button:focus-visible,
 a:focus-visible,
 input:focus-visible {
-  outline: 2px solid #10b981;
+  outline: 2px solid var(--color-emerald-500, #10b981);
   outline-offset: 2px;
 }
 
@@ -228,7 +228,7 @@ input:focus-visible {
 
 .light-theme aside nav button:hover {
   background-color: #f1f5f9 !important;
-  color: #10b981 !important;
+  color: var(--color-emerald-500, #10b981) !important;
 }
 
 .light-theme header {
@@ -331,7 +331,16 @@ input:focus-visible {
   --color-emerald-400: #82e22c !important;
   --color-emerald-500: #84cc16 !important;
   --color-emerald-600: #65b21e !important;
+  --color-green-300: #86efac !important;
+  --color-green-400: #4ade80 !important;
+  --color-green-500: #22c55e !important;
+  --color-green-600: #16a34a !important;
   --theme-glow: #82e22c !important;
+  --theme-dark-accent: #0b1c03 !important;
+  --theme-cta-from: #122405 !important;
+  --theme-cta-via: #0b1403 !important;
+  --theme-btn-text: #000000 !important;
+  --theme-spotlight-color: 130, 226, 44 !important;
 }
 
 .theme-teal {
@@ -339,7 +348,16 @@ input:focus-visible {
   --color-emerald-400: #2dd4bf !important;
   --color-emerald-500: #14b8a6 !important;
   --color-emerald-600: #0d9488 !important;
+  --color-green-300: #67e8f9 !important;
+  --color-green-400: #22d3ee !important;
+  --color-green-500: #06b6d4 !important;
+  --color-green-600: #0891b2 !important;
   --theme-glow: #2dd4bf !important;
+  --theme-dark-accent: #021a18 !important;
+  --theme-cta-from: #041f1c !important;
+  --theme-cta-via: #021412 !important;
+  --theme-btn-text: #000000 !important;
+  --theme-spotlight-color: 45, 212, 191 !important;
 }
 
 .theme-forest {
@@ -347,7 +365,16 @@ input:focus-visible {
   --color-emerald-400: #4ade80 !important;
   --color-emerald-500: #22c55e !important;
   --color-emerald-600: #16a34a !important;
+  --color-green-300: #6ee7b7 !important;
+  --color-green-400: #34d399 !important;
+  --color-green-500: #10b981 !important;
+  --color-green-600: #059669 !important;
   --theme-glow: #4ade80 !important;
+  --theme-dark-accent: #021c0e !important;
+  --theme-cta-from: #0c1c13 !important;
+  --theme-cta-via: #05140c !important;
+  --theme-btn-text: #ffffff !important;
+  --theme-spotlight-color: 34, 197, 94 !important;
 }
 
 .theme-indigo {
@@ -355,7 +382,20 @@ input:focus-visible {
   --color-emerald-400: #818cf8 !important;
   --color-emerald-500: #6366f1 !important;
   --color-emerald-600: #4f46e5 !important;
+  --color-green-300: #ddd6fe !important;
+  --color-green-400: #a78bfa !important;
+  --color-green-500: #8b5cf6 !important;
+  --color-green-600: #7c3aed !important;
   --theme-glow: #818cf8 !important;
+  --theme-dark-accent: #0b0d26 !important;
+  --theme-cta-from: #080a29 !important;
+  --theme-cta-via: #04051a !important;
+  --theme-btn-text: #ffffff !important;
+  --theme-spotlight-color: 99, 102, 241 !important;
+}
+
+.theme-glow-shadow {
+  box-shadow: 0 0 40px rgba(var(--theme-spotlight-color, 16, 185, 129), 0.06) !important;
 }
 
 .light-theme [class*="bg-[#121614]"],
@@ -520,7 +560,6 @@ input:focus-visible {
 /* Premium glow hover effect */
 .premium-glow-hover {
   position: relative;
-  overflow: hidden;
   transition: all 0.3s ease;
 }
 
@@ -587,7 +626,6 @@ input:focus-visible {
 /* Premium large glow hover effect for main containers */
 .premium-glow-large {
   position: relative;
-  overflow: hidden;
   transition: all 0.3s ease;
 }
 

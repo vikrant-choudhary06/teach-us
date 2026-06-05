@@ -121,7 +121,8 @@ export default function HeroSection() {
           {/* Badge Pill */}
           <motion.div
             variants={itemVariants}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-xs font-semibold tracking-wider uppercase mb-8 cursor-default shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-xs font-semibold tracking-wider uppercase mb-8 cursor-default"
+            style={{ boxShadow: '0 0 15px rgba(var(--theme-spotlight-color, 16, 185, 129), 0.1)' }}
           >
             <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-ping" />
             AI for Indian Education
@@ -209,11 +210,11 @@ export default function HeroSection() {
               <div className="w-1/4 min-w-[190px] border-r border-gray-100 p-4 bg-gray-50/30 flex flex-col gap-0.5 text-left">
                 {/* Sidebar Logo */}
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shadow-md">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--color-emerald-500)] to-[var(--color-green-400)] flex items-center justify-center shadow-md">
                     <HiBookOpen className="text-white" size={16} />
                   </div>
                   <span className="font-bold text-xs text-gray-900 tracking-tight flex items-center gap-1">
-                    Acharya <span className="text-emerald-600">AI</span>
+                    Acharya <span className="text-[var(--color-emerald-600)]">AI</span>
                   </span>
                 </div>
 
@@ -224,11 +225,11 @@ export default function HeroSection() {
                       key={idx}
                       className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-all duration-200 ${
                         item.active
-                          ? 'bg-emerald-50 text-emerald-600 border-l-[3px] border-emerald-600 rounded-l-none'
+                          ? 'bg-[var(--color-emerald-500)]/10 text-[var(--color-emerald-600)] border-l-[3px] border-[var(--color-emerald-600)] rounded-l-none'
                           : 'text-gray-500 hover:bg-gray-100/70 hover:text-gray-900'
                       }`}
                     >
-                      <Icon size={13} className={item.active ? 'text-emerald-600' : 'text-gray-400'} />
+                      <Icon size={13} className={item.active ? 'text-[var(--color-emerald-600)]' : 'text-gray-400'} />
                       {item.label}
                     </div>
                   );
@@ -247,7 +248,7 @@ export default function HeroSection() {
                       Ready to create something amazing? Your AI assistant is here to help.
                     </p>
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700 shadow-sm">
+                  <div className="w-8 h-8 rounded-full bg-[var(--color-emerald-500)]/20 flex items-center justify-center text-xs font-bold text-[var(--color-emerald-600)] shadow-sm">
                     S
                   </div>
                 </div>
@@ -278,7 +279,7 @@ export default function HeroSection() {
                         </span>
                         <div className="w-full h-1 bg-gray-100 rounded-full mt-1.5 overflow-hidden">
                           <div
-                            className="h-full bg-emerald-500 rounded-full"
+                            className="h-full bg-[var(--color-emerald-500)] rounded-full"
                             style={{ width: stat.value === '25' ? '40%' : '0%' }}
                           />
                         </div>
@@ -294,13 +295,13 @@ export default function HeroSection() {
                     return (
                       <div 
                         key={index}
-                        className="border border-gray-100 hover:border-emerald-200 rounded-xl p-3.5 flex flex-col justify-between bg-white shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                        className="border border-gray-100 hover:border-[var(--color-emerald-300)]/50 rounded-xl p-3.5 flex flex-col justify-between bg-white shadow-sm hover:shadow-md transition-all cursor-pointer group"
                       >
                         <div>
-                          <div className="w-6 h-6 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-500 mb-2 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
+                          <div className="w-6 h-6 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-500 mb-2 group-hover:bg-[var(--color-emerald-500)]/10 group-hover:text-[var(--color-emerald-600)] transition-colors">
                             <ToolIcon />
                           </div>
-                          <h4 className="text-[10px] font-extrabold text-gray-800 mb-1 group-hover:text-emerald-600 transition-colors">
+                          <h4 className="text-[10px] font-extrabold text-gray-800 mb-1 group-hover:text-[var(--color-emerald-600)] transition-colors">
                             {tool.title}
                           </h4>
                           <p className="text-[9px] text-gray-400 leading-snug font-medium">
@@ -308,7 +309,7 @@ export default function HeroSection() {
                           </p>
                         </div>
 
-                        <div className="flex items-center justify-between text-[8px] font-bold text-gray-400 mt-3 border-t border-gray-50 pt-1.5 group-hover:text-emerald-500 transition-colors">
+                        <div className="flex items-center justify-between text-[8px] font-bold text-gray-400 mt-3 border-t border-gray-50 pt-1.5 group-hover:text-[var(--color-emerald-500)] transition-colors">
                           <span>{tool.action}</span>
                           <HiChevronRight size={10} className="transform group-hover:translate-x-0.5 transition-transform" />
                         </div>
