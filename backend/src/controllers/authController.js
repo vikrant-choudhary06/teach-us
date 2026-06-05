@@ -116,6 +116,7 @@ export const loginUser = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        picture: user.picture,
         token: generateToken(user._id),
       });
     } else {
@@ -156,7 +157,7 @@ export const googleLogin = async (req, res) => {
     });
 
     const payload = ticket.getPayload();
-    const { sub: googleId, email, name } = payload;
+    const { sub: googleId, email, name, picture } = payload;
 
     // Check if user already exists by googleId or email
     let user = await User.findOne({ $or: [{ googleId }, { email }] });
@@ -172,6 +173,10 @@ export const googleLogin = async (req, res) => {
         user.isVerified = true;
         updated = true;
       }
+      if (picture && user.picture !== picture) {
+        user.picture = picture;
+        updated = true;
+      }
       if (updated) {
         await user.save();
       }
@@ -183,6 +188,7 @@ export const googleLogin = async (req, res) => {
         googleId,
         role: role || 'Teacher',
         isVerified: true,
+        picture,
       });
 
       // Send welcome email asynchronously for new Google users
@@ -196,6 +202,7 @@ export const googleLogin = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      picture: user.picture,
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -250,6 +257,7 @@ export const verifyOTP = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      picture: user.picture,
       token: generateToken(user._id),
       message: 'Account verified successfully!'
     });

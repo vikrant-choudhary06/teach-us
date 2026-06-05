@@ -43,10 +43,19 @@ import {
 
 export default function Dashboard() {
   const [isDarkMode, setIsDarkMode] = useState(() => {
+    const email = localStorage.getItem('userEmail')
+    if (email && email !== 'educator@acharya.ai') {
+      const saved = localStorage.getItem(`acharyai_${email}_isDarkMode`)
+      if (saved !== null) return saved === 'true'
+    }
     const saved = localStorage.getItem('isDarkMode')
     return saved !== null ? saved === 'true' : true
   })
   const [colorTheme, setColorTheme] = useState(() => {
+    const email = localStorage.getItem('userEmail')
+    if (email && email !== 'educator@acharya.ai') {
+      return localStorage.getItem(`acharyai_${email}_colorTheme`) || 'fresh'
+    }
     return localStorage.getItem('colorTheme') || 'fresh'
   })
   const [activeTab, setActiveTab] = useState('overview')
@@ -54,9 +63,17 @@ export default function Dashboard() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [userEmail, setUserEmail] = useState('educator@acharya.ai')
   const [userName, setUserName] = useState('Educator')
+  const [userPicture, setUserPicture] = useState('')
   const [isAIChatOpen, setIsAIChatOpen] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
-  const [credits, setCredits] = useState(30)
+  const [credits, setCredits] = useState(() => {
+    const email = localStorage.getItem('userEmail')
+    if (email && email !== 'educator@acharya.ai') {
+      const saved = localStorage.getItem(`acharyai_${email}_credits`)
+      if (saved !== null) return parseInt(saved, 10)
+    }
+    return 30
+  })
   const navigate = useNavigate()
 
   const handleMouseMove = (e) => {
@@ -67,25 +84,61 @@ export default function Dashboard() {
     e.currentTarget.style.setProperty('--y', `${y}px`)
   }
 
-  const [uploadedPages, setUploadedPages] = useState([])
-  const [digitizedResult, setDigitizedResult] = useState(null)
+  const [uploadedPages, setUploadedPages] = useState(() => {
+    const email = localStorage.getItem('userEmail')
+    if (email && email !== 'educator@acharya.ai') {
+      const saved = localStorage.getItem(`acharyai_${email}_uploadedPages`)
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return []
+  })
+  const [digitizedResult, setDigitizedResult] = useState(() => {
+    const email = localStorage.getItem('userEmail')
+    if (email && email !== 'educator@acharya.ai') {
+      const saved = localStorage.getItem(`acharyai_${email}_digitizedResult`)
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return null
+  })
 
-  const [students, setStudents] = useState([
-    { id: 1, name: 'Aarav Sharma', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reviewing slides', doubt: null, row: 0, col: 0, grade: '23/25', aiFeedback: 'Well structured and clear math definitions.' },
-    { id: 2, name: 'Isha Patel', status: 'distracted', lastActive: '2m ago', assignmentStatus: 'Pending', currentProgress: 'Idle', doubt: null, row: 0, col: 1, grade: 'N/A', aiFeedback: '' },
-    { id: 3, name: 'Rohan Das', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Not Started', currentProgress: 'Reading PDF', doubt: 'Need help with Convolutional step', row: 0, col: 2, grade: 'N/A', aiFeedback: '' },
-    { id: 4, name: 'Sanya Sen', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Pending Grade)', currentProgress: 'Note-taking', doubt: null, row: 1, col: 0, grade: 'N/A', aiFeedback: '' },
-    { id: 5, name: 'Aditya Verma', status: 'distracted', lastActive: '5m ago', assignmentStatus: 'Needs Revision', currentProgress: 'Tabbed out', doubt: 'How does max pooling work?', row: 1, col: 1, grade: '12/25', aiFeedback: 'Incomplete matrix computations in section B.' },
-    { id: 6, name: 'Neha Rao', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reading PDF', doubt: null, row: 1, col: 2, grade: '24/25', aiFeedback: 'Excellent reasoning and detailed calculus proofs.' },
-    { id: 7, name: 'Vikram Singh', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Pending', currentProgress: 'Answering Poll', doubt: null, row: 2, col: 0, grade: 'N/A', aiFeedback: '' },
-    { id: 8, name: 'Ananya Goel', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reading PDF', doubt: null, row: 2, col: 1, grade: '21/25', aiFeedback: 'Solid integration steps. Keep practicing limits.' },
-    { id: 9, name: 'Kabir Mehta', status: 'distracted', lastActive: '3m ago', assignmentStatus: 'Not Started', currentProgress: 'Idle', doubt: null, row: 2, col: 2, grade: 'N/A', aiFeedback: '' },
-    { id: 10, name: 'Priya Nair', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Pending Grade)', currentProgress: 'Taking notes', doubt: null, row: 3, col: 0, grade: 'N/A', aiFeedback: '' },
-    { id: 11, name: 'Rishi Kapoor', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Pending', currentProgress: 'Reviewing slides', doubt: null, row: 3, col: 1, grade: 'N/A', aiFeedback: '' },
-    { id: 12, name: 'Tara Iyer', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Answering Poll', doubt: null, row: 3, col: 2, grade: '22/25', aiFeedback: 'Good layout and formula definitions.' },
-  ])
+  const [students, setStudents] = useState(() => {
+    const email = localStorage.getItem('userEmail')
+    if (email && email !== 'educator@acharya.ai') {
+      const saved = localStorage.getItem(`acharyai_${email}_students`)
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return [
+      { id: 1, name: 'Aarav Sharma', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reviewing slides', doubt: null, row: 0, col: 0, grade: '23/25', aiFeedback: 'Well structured and clear math definitions.' },
+      { id: 2, name: 'Isha Patel', status: 'distracted', lastActive: '2m ago', assignmentStatus: 'Pending', currentProgress: 'Idle', doubt: null, row: 0, col: 1, grade: 'N/A', aiFeedback: '' },
+      { id: 3, name: 'Rohan Das', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Not Started', currentProgress: 'Reading PDF', doubt: 'Need help with Convolutional step', row: 0, col: 2, grade: 'N/A', aiFeedback: '' },
+      { id: 4, name: 'Sanya Sen', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Pending Grade)', currentProgress: 'Note-taking', doubt: null, row: 1, col: 0, grade: 'N/A', aiFeedback: '' },
+      { id: 5, name: 'Aditya Verma', status: 'distracted', lastActive: '5m ago', assignmentStatus: 'Needs Revision', currentProgress: 'Tabbed out', doubt: 'How does max pooling work?', row: 1, col: 1, grade: '12/25', aiFeedback: 'Incomplete matrix computations in section B.' },
+      { id: 6, name: 'Neha Rao', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reading PDF', doubt: null, row: 1, col: 2, grade: '24/25', aiFeedback: 'Excellent reasoning and detailed calculus proofs.' },
+      { id: 7, name: 'Vikram Singh', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Pending', currentProgress: 'Answering Poll', doubt: null, row: 2, col: 0, grade: 'N/A', aiFeedback: '' },
+      { id: 8, name: 'Ananya Goel', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Reading PDF', doubt: null, row: 2, col: 1, grade: '21/25', aiFeedback: 'Solid integration steps. Keep practicing limits.' },
+      { id: 9, name: 'Kabir Mehta', status: 'distracted', lastActive: '3m ago', assignmentStatus: 'Not Started', currentProgress: 'Idle', doubt: null, row: 2, col: 2, grade: 'N/A', aiFeedback: '' },
+      { id: 10, name: 'Priya Nair', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Pending Grade)', currentProgress: 'Taking notes', doubt: null, row: 3, col: 0, grade: 'N/A', aiFeedback: '' },
+      { id: 11, name: 'Rishi Kapoor', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Pending', currentProgress: 'Reviewing slides', doubt: null, row: 3, col: 1, grade: 'N/A', aiFeedback: '' },
+      { id: 12, name: 'Tara Iyer', status: 'focused', lastActive: 'Active now', assignmentStatus: 'Submitted (Graded)', currentProgress: 'Answering Poll', doubt: null, row: 3, col: 2, grade: '22/25', aiFeedback: 'Good layout and formula definitions.' },
+    ]
+  })
 
-  const [deployedMaterial, setDeployedMaterial] = useState(null)
+  const [deployedMaterial, setDeployedMaterial] = useState(() => {
+    const email = localStorage.getItem('userEmail')
+    if (email && email !== 'educator@acharya.ai') {
+      const saved = localStorage.getItem(`acharyai_${email}_deployedMaterial`)
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+    }
+    return null
+  })
 
   // Toast notification state
   const [toast, setToast] = useState(null)
@@ -116,6 +169,9 @@ export default function Dashboard() {
         if (info.name) {
           setUserName(info.name)
         }
+        if (info.picture) {
+          setUserPicture(info.picture)
+        }
       } catch (e) {
         console.error('Error parsing userInfo:', e)
       }
@@ -138,6 +194,37 @@ export default function Dashboard() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // User-specific State Syncing Effects
+  useEffect(() => {
+    if (userEmail && userEmail !== 'educator@acharya.ai') {
+      localStorage.setItem(`acharyai_${userEmail}_students`, JSON.stringify(students))
+    }
+  }, [students, userEmail])
+
+  useEffect(() => {
+    if (userEmail && userEmail !== 'educator@acharya.ai') {
+      localStorage.setItem(`acharyai_${userEmail}_credits`, credits.toString())
+    }
+  }, [credits, userEmail])
+
+  useEffect(() => {
+    if (userEmail && userEmail !== 'educator@acharya.ai') {
+      localStorage.setItem(`acharyai_${userEmail}_uploadedPages`, JSON.stringify(uploadedPages))
+    }
+  }, [uploadedPages, userEmail])
+
+  useEffect(() => {
+    if (userEmail && userEmail !== 'educator@acharya.ai') {
+      localStorage.setItem(`acharyai_${userEmail}_digitizedResult`, JSON.stringify(digitizedResult))
+    }
+  }, [digitizedResult, userEmail])
+
+  useEffect(() => {
+    if (userEmail && userEmail !== 'educator@acharya.ai') {
+      localStorage.setItem(`acharyai_${userEmail}_deployedMaterial`, JSON.stringify(deployedMaterial))
+    }
+  }, [deployedMaterial, userEmail])
 
   const handleLogout = () => {
     localStorage.removeItem('userEmail')
@@ -467,9 +554,13 @@ export default function Dashboard() {
                 title="Account Settings"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center font-bold text-emerald-600 text-sm shrink-0 uppercase">
-                    {(userName || userEmail).substring(0, 2).toUpperCase()}
-                  </div>
+                  {userPicture ? (
+                    <img src={userPicture} alt="Profile" className="w-9 h-9 rounded-full border border-emerald-500/20 object-cover shrink-0" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center font-bold text-emerald-600 text-sm shrink-0 uppercase">
+                      {(userName || userEmail).substring(0, 2).toUpperCase()}
+                    </div>
+                  )}
                   <div className="min-w-0 flex flex-col text-left">
                     <span className="text-xs sm:text-sm font-bold text-gray-800 dark:text-white truncate max-w-[120px] leading-tight">
                       {userName || userEmail}
@@ -485,10 +576,14 @@ export default function Dashboard() {
               <div className="flex justify-center">
                 <button
                   onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                  className="w-9 h-9 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 flex items-center justify-center text-emerald-600 font-bold uppercase transition-all shrink-0 cursor-pointer"
+                  className="w-9 h-9 rounded-full overflow-hidden border border-emerald-500/20 flex items-center justify-center text-emerald-600 font-bold uppercase transition-all shrink-0 cursor-pointer bg-emerald-500/10"
                   title="Account Settings"
                 >
-                  {(userName || userEmail).substring(0, 2).toUpperCase()}
+                  {userPicture ? (
+                    <img src={userPicture} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    (userName || userEmail).substring(0, 2).toUpperCase()
+                  )}
                 </button>
               </div>
             )}
@@ -568,15 +663,19 @@ export default function Dashboard() {
                   </div>
 
                   <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-lg border border-white/10">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center font-black text-emerald-400 text-sm">
-                        {(userName || userEmail).substring(0, 2).toUpperCase()}
-                      </div>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {userPicture ? (
+                        <img src={userPicture} alt="Profile" className="w-8 h-8 rounded-lg border border-emerald-500/20 object-cover shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center font-black text-emerald-400 text-sm shrink-0 uppercase">
+                          {(userName || userEmail).substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
                       <div className="min-w-0 text-left">
                         <p className="text-sm font-black text-white truncate">{userName}</p>
                       </div>
                     </div>
-                    <button onClick={handleLogout} className="text-gray-400 hover:text-red-400">
+                    <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 shrink-0">
                       <HiOutlineLogout size={16} />
                     </button>
                   </div>
@@ -2917,6 +3016,10 @@ export function SettingsView({ showToast, userEmail, isDarkMode, setIsDarkMode, 
   }
 
   const handleSaveSettings = () => {
+    if (userEmail && userEmail !== 'educator@acharya.ai') {
+      localStorage.setItem(`acharyai_${userEmail}_colorTheme`, colorTheme)
+      localStorage.setItem(`acharyai_${userEmail}_isDarkMode`, isDarkMode.toString())
+    }
     localStorage.setItem('colorTheme', colorTheme)
     localStorage.setItem('isDarkMode', isDarkMode.toString())
     showToast('Settings saved successfully!', 'success')

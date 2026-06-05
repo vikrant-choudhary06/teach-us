@@ -34,6 +34,24 @@ export default function LoginPage() {
     e.currentTarget.style.setProperty('--y', `${y}px`)
   }
 
+  const decodeJwt = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        window
+          .atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      console.error('Failed to decode JWT:', e);
+      return null;
+    }
+  };
+
   const handleGoogleSuccess = async (credential) => {
     setError('')
     setLoading(true)
@@ -51,8 +69,14 @@ export default function LoginPage() {
         throw new Error(data.message || 'Google Authentication failed')
       }
 
+      const decoded = decodeJwt(credential);
+      const googlePicture = decoded?.picture || '';
+
       localStorage.setItem('userEmail', data.email)
-      localStorage.setItem('userInfo', JSON.stringify(data))
+      localStorage.setItem('userInfo', JSON.stringify({
+        ...data,
+        picture: data.picture || googlePicture
+      }))
       navigate('/professor-dashboard')
     } catch (err) {
       setError(err.message)
