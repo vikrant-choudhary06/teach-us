@@ -91,6 +91,11 @@ export default function Dashboard() {
     return 'Educator'
   })
   const [userPicture, setUserPicture] = useState('')
+  const [subjectsTaught, setSubjectsTaught] = useState(() => localStorage.getItem('profile_subjectsTaught') || '')
+  const [experience, setExperience] = useState(() => localStorage.getItem('profile_experience') || '')
+  const [qualification, setQualification] = useState(() => localStorage.getItem('profile_qualification') || '')
+  const [aboutMe, setAboutMe] = useState(() => localStorage.getItem('profile_aboutMe') || 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.')
+  const [memberSince, setMemberSince] = useState(() => localStorage.getItem('profile_memberSince') || '')
   const [isAIChatOpen, setIsAIChatOpen] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [credits, setCredits] = useState(() => {
@@ -255,15 +260,15 @@ export default function Dashboard() {
                     id: st._id,
                     name: st.name,
                     email: st.email || '',
-                    status: 'focused',
+                    status: st.status || 'focused',
                     lastActive: 'Active now',
-                    assignmentStatus: 'Not Started',
-                    currentProgress: 'Idle',
-                    doubt: null,
-                    row: Math.floor(index / 3),
-                    col: index % 3,
-                    grade: 'N/A',
-                    aiFeedback: ''
+                    assignmentStatus: st.assignmentStatus || 'Not Started',
+                    currentProgress: st.currentProgress || 'Idle',
+                    doubt: st.doubt !== undefined ? st.doubt : null,
+                    row: st.row !== undefined ? st.row : Math.floor(index / 3),
+                    col: st.col !== undefined ? st.col : index % 3,
+                    grade: st.grade || 'N/A',
+                    aiFeedback: st.aiFeedback || ''
                   }))
                   setStudents(mapped)
                   localStorage.setItem('real_students', JSON.stringify(mapped))
@@ -285,12 +290,26 @@ export default function Dashboard() {
               })
               if (res.ok) {
                 const data = await res.json()
+                if (data.name) {
+                  setUserName(data.name)
+                  localStorage.setItem('profile_name', data.name)
+                }
+                if (data.picture) {
+                  setUserPicture(data.picture)
+                  localStorage.setItem('profile_image', data.picture)
+                }
+                if (data.credits !== undefined) setCredits(data.credits)
+                if (data.subjectsTaught !== undefined) setSubjectsTaught(data.subjectsTaught)
+                if (data.experience !== undefined) setExperience(data.experience)
+                if (data.qualification !== undefined) setQualification(data.qualification)
+                if (data.aboutMe !== undefined) setAboutMe(data.aboutMe)
                 if (data.createdAt) {
                   const date = new Date(data.createdAt)
                   const day = String(date.getDate()).padStart(2, '0')
                   const month = String(date.getMonth() + 1).padStart(2, '0')
                   const year = date.getFullYear()
                   const formattedDate = `${day}/${month}/${year}`
+                  setMemberSince(formattedDate)
                   localStorage.setItem('profile_memberSince', formattedDate)
                 }
               }
@@ -334,6 +353,26 @@ export default function Dashboard() {
   useEffect(() => {
     if (userEmail && userEmail !== 'educator@acharya.ai') {
       localStorage.setItem(`acharyai_${userEmail}_credits`, credits.toString())
+      const syncCredits = async () => {
+        try {
+          const savedInfo = localStorage.getItem('userInfo')
+          if (!savedInfo) return
+          const info = JSON.parse(savedInfo)
+          if (!info.token) return
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+          await fetch(`${API_URL}/api/auth/profile`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${info.token}`
+            },
+            body: JSON.stringify({ credits })
+          })
+        } catch (e) {
+          console.error('Failed to sync credits with backend:', e)
+        }
+      }
+      syncCredits()
     }
   }, [credits, userEmail])
 
@@ -522,6 +561,11 @@ export default function Dashboard() {
             assetsCreated={assetsCreated}
             totalStudents={students.length}
             weeklyActivity={weeklyActivity}
+            subjectsTaught={subjectsTaught}
+            experience={experience}
+            qualification={qualification}
+            aboutMe={aboutMe}
+            memberSince={memberSince}
             onEditRedirect={() => {
               setActiveTab('settings')
               setSettingsTab('profile')
@@ -544,6 +588,18 @@ export default function Dashboard() {
             setCurrentTab={setSettingsTab}
             totalTopics={totalTopics}
             assetsCreated={assetsCreated}
+            subjectsTaught={subjectsTaught}
+            setSubjectsTaught={setSubjectsTaught}
+            experience={experience}
+            setExperience={setExperience}
+            qualification={qualification}
+            setQualification={setQualification}
+            aboutMe={aboutMe}
+            setAboutMe={setAboutMe}
+            memberSince={memberSince}
+            setMemberSince={setMemberSince}
+            userPicture={userPicture}
+            setUserPicture={setUserPicture}
           />
         )
       default:
@@ -1327,14 +1383,35 @@ function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, 
     e.preventDefault()
   }
 
+  const syncStudentPosition = async (studentId, row, col) => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      if (!info.token) return
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      await fetch(`${API_URL}/api/students/${studentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${info.token}`
+        },
+        body: JSON.stringify({ row, col })
+      })
+    } catch (err) {
+      console.error('Failed to sync student position:', err)
+    }
+  }
+
   const handleDrop = (e, targetRow, targetCol) => {
     e.preventDefault()
-    const draggedStudentId = parseInt(e.dataTransfer.getData('text/plain'), 10)
-    if (isNaN(draggedStudentId)) return
+    const draggedStudentId = e.dataTransfer.getData('text/plain')
+    if (!draggedStudentId) return
 
     setStudents(prev => {
       const copy = prev.map(s => ({ ...s }))
-      const sourceStudent = copy.find(s => s.id === draggedStudentId)
+      const sourceStudent = copy.find(s => s.id.toString() === draggedStudentId.toString())
       const targetStudent = copy.find(s => s.row === targetRow && s.col === targetCol)
 
       if (sourceStudent) {
@@ -1346,10 +1423,14 @@ function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, 
           sourceStudent.col = targetStudent.col
           targetStudent.row = tempRow
           targetStudent.col = tempCol
+
+          syncStudentPosition(sourceStudent.id, sourceStudent.row, sourceStudent.col)
+          syncStudentPosition(targetStudent.id, targetStudent.row, targetStudent.col)
         } else {
           // Move to empty cell
           sourceStudent.row = targetRow
           sourceStudent.col = targetCol
+          syncStudentPosition(sourceStudent.id, sourceStudent.row, sourceStudent.col)
         }
       }
       return copy
@@ -1364,7 +1445,27 @@ function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, 
 
   const handleResolveDoubt = (studentId) => {
     setStudents(prev => prev.map(s => {
-      if (s.id === studentId) {
+      if (s.id.toString() === studentId.toString()) {
+        const syncDoubt = async () => {
+          try {
+            const savedInfo = localStorage.getItem('userInfo')
+            if (!savedInfo) return
+            const info = JSON.parse(savedInfo)
+            if (!info.token) return
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+            await fetch(`${API_URL}/api/students/${studentId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${info.token}`
+              },
+              body: JSON.stringify({ doubt: null, status: 'focused' })
+            })
+          } catch (err) {
+            console.error('Failed to resolve student doubt in backend:', err)
+          }
+        }
+        syncDoubt()
         return { ...s, doubt: null, status: 'focused' }
       }
       return s
@@ -3088,24 +3189,28 @@ export function SupportView({ showToast }) {
   )
 }
 
-export function ProfileView({ userEmail, userName, showToast, totalTopics = 0, assetsCreated = 0, totalStudents = 12, weeklyActivity = 0, onEditRedirect, setActiveTab }) {
+export function ProfileView({ 
+  userEmail, 
+  userName, 
+  showToast, 
+  totalTopics = 0, 
+  assetsCreated = 0, 
+  totalStudents = 12, 
+  weeklyActivity = 0, 
+  onEditRedirect, 
+  setActiveTab,
+  subjectsTaught = '',
+  experience = '',
+  qualification = '',
+  aboutMe = 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.',
+  memberSince = '',
+}) {
   const profileImage = localStorage.getItem('profile_image') || null
   const coverImage = localStorage.getItem('profile_cover') || null
   const profileName = localStorage.getItem('profile_name') || userName || userEmail
   
   const schoolName = localStorage.getItem('profile_schoolName') || ''
-  const subjectsTaught = localStorage.getItem('profile_subjectsTaught') || ''
-  const experience = localStorage.getItem('profile_experience') || ''
-  const qualification = localStorage.getItem('profile_qualification') || ''
-  const memberSince = localStorage.getItem('profile_memberSince') || (() => {
-    const date = new Date()
-    const day = String(date.getDate()).padStart(2, '0')
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const year = date.getFullYear()
-    return `${day}/${month}/${year}`
-  })()
-  const aboutMe = localStorage.getItem('profile_aboutMe') || 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.'
-
+  
   const usedAiToolsCount = (() => {
     try {
       const list = JSON.parse(localStorage.getItem('used_ai_tools') || '[]')
@@ -3373,25 +3478,42 @@ export function ProfileView({ userEmail, userName, showToast, totalTopics = 0, a
   )
 }
 
-export function EditProfileForm({ userEmail, userName, setUserName, showToast }) {
-  const [profileImage, setProfileImage] = useState(() => localStorage.getItem('profile_image') || null)
+export function EditProfileForm({ 
+  userEmail, 
+  userName, 
+  setUserName, 
+  showToast,
+  subjectsTaught: parentSubjectsTaught,
+  setSubjectsTaught: setParentSubjectsTaught,
+  experience: parentExperience,
+  setExperience: setParentExperience,
+  qualification: parentQualification,
+  setQualification: setParentQualification,
+  aboutMe: parentAboutMe,
+  setAboutMe: setParentAboutMe,
+  memberSince: parentMemberSince,
+  setMemberSince: setParentMemberSince,
+  userPicture,
+  setUserPicture
+}) {
+  const [profileImage, setProfileImage] = useState(() => localStorage.getItem('profile_image') || userPicture || null)
   const [coverImage, setCoverImage] = useState(() => localStorage.getItem('profile_cover') || null)
   const profileInputRef = useRef(null)
   const coverInputRef = useRef(null)
   
   const [fullName, setFullName] = useState(() => localStorage.getItem('profile_name') || userName || '')
   const [schoolName, setSchoolName] = useState(() => localStorage.getItem('profile_schoolName') || '')
-  const [subjectsTaught, setSubjectsTaught] = useState(() => localStorage.getItem('profile_subjectsTaught') || '')
-  const [experience, setExperience] = useState(() => localStorage.getItem('profile_experience') || '')
-  const [qualification, setQualification] = useState(() => localStorage.getItem('profile_qualification') || '')
-  const [memberSince, setMemberSince] = useState(() => localStorage.getItem('profile_memberSince') || (() => {
+  const [subjectsTaught, setSubjectsTaught] = useState(parentSubjectsTaught)
+  const [experience, setExperience] = useState(parentExperience)
+  const [qualification, setQualification] = useState(parentQualification)
+  const [memberSince, setMemberSince] = useState(parentMemberSince || (() => {
     const date = new Date()
     const day = String(date.getDate()).padStart(2, '0')
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const year = date.getFullYear()
     return `${day}/${month}/${year}`
   })())
-  const [aboutMe, setAboutMe] = useState(() => localStorage.getItem('profile_aboutMe') || 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.')
+  const [aboutMe, setAboutMe] = useState(parentAboutMe || 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.')
 
   const handleFileClick = (type) => {
     if (type === 'profile' && profileInputRef.current) {
@@ -3420,18 +3542,55 @@ export function EditProfileForm({ userEmail, userName, setUserName, showToast })
     }
   }
 
-  const handleSaveProfile = () => {
-    localStorage.setItem('profile_name', fullName)
-    localStorage.setItem('profile_schoolName', schoolName)
-    localStorage.setItem('profile_subjectsTaught', subjectsTaught)
-    localStorage.setItem('profile_experience', experience)
-    localStorage.setItem('profile_qualification', qualification)
-    localStorage.setItem('profile_memberSince', memberSince)
-    localStorage.setItem('profile_aboutMe', aboutMe)
-    if (setUserName) {
-      setUserName(fullName)
+  const handleSaveProfile = async () => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      if (!info.token) return
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${info.token}`
+        },
+        body: JSON.stringify({
+          name: fullName,
+          picture: profileImage,
+          subjectsTaught,
+          experience,
+          qualification,
+          aboutMe
+        })
+      })
+
+      if (res.ok) {
+        localStorage.setItem('profile_name', fullName)
+        localStorage.setItem('profile_schoolName', schoolName)
+        localStorage.setItem('profile_subjectsTaught', subjectsTaught)
+        localStorage.setItem('profile_experience', experience)
+        localStorage.setItem('profile_qualification', qualification)
+        localStorage.setItem('profile_memberSince', memberSince)
+        localStorage.setItem('profile_aboutMe', aboutMe)
+        
+        if (setUserName) setUserName(fullName)
+        if (setParentSubjectsTaught) setParentSubjectsTaught(subjectsTaught)
+        if (setParentExperience) setParentExperience(experience)
+        if (setParentQualification) setParentQualification(qualification)
+        if (setParentAboutMe) setParentAboutMe(aboutMe)
+        if (setParentMemberSince) setParentMemberSince(memberSince)
+        if (setUserPicture && profileImage) setUserPicture(profileImage)
+
+        showToast('Profile updated successfully!', 'success')
+      } else {
+        showToast('Failed to update profile.', 'error')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('Failed to update profile due to connection error.', 'error')
     }
-    showToast('Profile updated successfully!', 'success')
   }
 
   return (
@@ -3633,7 +3792,19 @@ export function SettingsView({
   currentTab,
   setCurrentTab,
   totalTopics,
-  assetsCreated
+  assetsCreated,
+  subjectsTaught,
+  setSubjectsTaught,
+  experience,
+  setExperience,
+  qualification,
+  setQualification,
+  aboutMe,
+  setAboutMe,
+  memberSince,
+  setMemberSince,
+  userPicture,
+  setUserPicture
 }) {
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -3717,6 +3888,18 @@ export function SettingsView({
             userEmail={userEmail}
             userName={userName}
             setUserName={setUserName}
+            subjectsTaught={subjectsTaught}
+            setSubjectsTaught={setSubjectsTaught}
+            experience={experience}
+            setExperience={setExperience}
+            qualification={qualification}
+            setQualification={setQualification}
+            aboutMe={aboutMe}
+            setAboutMe={setAboutMe}
+            memberSince={memberSince}
+            setMemberSince={setMemberSince}
+            userPicture={userPicture}
+            setUserPicture={setUserPicture}
           />
         )}
 

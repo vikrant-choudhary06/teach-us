@@ -130,3 +130,32 @@ export const getStudentStats = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const updateStudent = async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    if (student.teacherId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to update this student' });
+    }
+
+    const { row, col, status, assignmentStatus, currentProgress, doubt, grade, aiFeedback } = req.body;
+
+    if (row !== undefined) student.row = row;
+    if (col !== undefined) student.col = col;
+    if (status !== undefined) student.status = status;
+    if (assignmentStatus !== undefined) student.assignmentStatus = assignmentStatus;
+    if (currentProgress !== undefined) student.currentProgress = currentProgress;
+    if (doubt !== undefined) student.doubt = doubt;
+    if (grade !== undefined) student.grade = grade;
+    if (aiFeedback !== undefined) student.aiFeedback = aiFeedback;
+
+    const updated = await student.save();
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

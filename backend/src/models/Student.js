@@ -31,6 +31,38 @@ const studentSchema = new mongoose.Schema(
       type: String,
       default: 'General',
     },
+    row: {
+      type: Number,
+      default: 0,
+    },
+    col: {
+      type: Number,
+      default: 0,
+    },
+    status: {
+      type: String,
+      default: 'focused',
+    },
+    assignmentStatus: {
+      type: String,
+      default: 'Not Started',
+    },
+    currentProgress: {
+      type: String,
+      default: 'Idle',
+    },
+    doubt: {
+      type: String,
+      default: null,
+    },
+    grade: {
+      type: String,
+      default: 'N/A',
+    },
+    aiFeedback: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: true,
