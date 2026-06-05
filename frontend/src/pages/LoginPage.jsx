@@ -24,6 +24,9 @@ const features = [
 export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [colorTheme] = useState(() => {
+    return localStorage.getItem('colorTheme') || 'fresh'
+  })
   const navigate = useNavigate()
 
   const handleMouseMove = (e) => {
@@ -86,7 +89,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div onMouseMove={handleMouseMove} className="min-h-screen w-full flex overflow-hidden bg-[#020604] text-[#f1f5f9] font-sans relative premium-glow-global">
+    <div onMouseMove={handleMouseMove} className={`min-h-screen w-full flex overflow-hidden bg-[#020604] text-[#f1f5f9] font-sans relative premium-glow-global theme-${colorTheme}`}>
       {/* Background Orbits */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
         <div className="absolute top-[-250px] left-[-250px] w-[800px] h-[800px] rounded-full bg-emerald-500/[0.04] blur-[150px]" />

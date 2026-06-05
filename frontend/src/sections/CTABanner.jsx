@@ -11,7 +11,7 @@ export default function CTABanner() {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="rounded-3xl bg-gradient-to-br from-[#0c1c13] via-[#05140c] to-[#0c1c13] px-8 py-16 md:px-16 md:py-24 border border-white/[0.08] relative overflow-hidden shadow-2xl"
+          className="rounded-3xl bg-gradient-to-br from-[var(--theme-cta-from,#0c1c13)] via-[var(--theme-cta-via,#05140c)] to-[var(--theme-cta-from,#0c1c13)] px-8 py-16 md:px-16 md:py-24 border border-white/[0.08] relative overflow-hidden shadow-2xl"
         >
           {/* Animated Background Elements */}
           <motion.div
