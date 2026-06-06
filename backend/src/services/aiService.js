@@ -43,7 +43,7 @@ export const gradeHomeworkWithAI = async (filePath, rubric, mimeType) => {
       Do NOT wrap the JSON inside markdown code blocks (e.g. \`\`\`json). Return ONLY the raw valid JSON string.
     `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' });
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
     const responseText = response.text() || '';
@@ -90,7 +90,7 @@ export const summarizeLessonWithAI = async (transcriptionText, whiteboardLogs) =
       Format beautifully in clean GitHub-Flavored Markdown.
     `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text() || 'No summary could be generated.';
@@ -126,7 +126,7 @@ export const solveMathWithAI = async (problem, topic) => {
       Do NOT wrap the JSON inside markdown code blocks (e.g. \`\`\`json). Return ONLY the raw valid JSON string.
     `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const responseText = response.text() || '';
@@ -171,7 +171,7 @@ export const digitizePaperWithAI = async (filePath, mimeType) => {
       Do NOT wrap the JSON inside markdown code blocks (e.g. \`\`\`json). Return ONLY the raw valid JSON string.
     `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' });
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
     const responseText = response.text() || '';
@@ -238,7 +238,7 @@ export const generateLessonPlanWithAI = async (grade, subject, topic, duration, 
       Do NOT wrap the JSON inside markdown code blocks (e.g. \`\`\`json). Return ONLY the raw valid JSON string.
     `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const responseText = response.text() || '';
@@ -279,7 +279,7 @@ export const generateVisualAidWithAI = async (promptText, type) => {
       Do NOT wrap the JSON inside markdown code blocks (e.g. \`\`\`json). Return ONLY the raw valid JSON string.
     `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
     const result = await model.generateContent(promptBody);
     const response = await result.response;
     const responseText = response.text() || '';
