@@ -118,6 +118,11 @@ export default function StudentDashboard() {
   // Live Class / Flight Deck Sync state
   const [liveMaterial, setLiveMaterial] = useState(null)
   const [activeMode, setActiveMode] = useState('presentation')
+  const [isJoined, setIsJoined] = useState(false)
+  const [pdfUrl, setPdfUrl] = useState(null)
+  const [pdfName, setPdfName] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+
 
   // Synced drawing board states
   const canvasRef = useRef(null)
@@ -290,11 +295,30 @@ export default function StudentDashboard() {
 
     socketRef.current.on('student:join_success', ({ deckUid }) => {
       alert(`Successfully joined Professor's Deck: ${deckUid}`)
+      setIsJoined(true)
       setLiveMaterial(null)
     })
 
     socketRef.current.on('student:join_error', ({ message }) => {
       alert(`Join failed: ${message}`)
+    })
+
+    socketRef.current.on('student:sync_state', ({ activeMode, pdfUrl, pdfName, currentPage, liveMaterial }) => {
+      setActiveMode(activeMode)
+      setPdfUrl(pdfUrl)
+      setPdfName(pdfName)
+      setCurrentPage(currentPage || 1)
+      setLiveMaterial(liveMaterial)
+    })
+
+    socketRef.current.on('student:sync_pdf', ({ pdfUrl, pdfName, currentPage }) => {
+      setPdfUrl(pdfUrl)
+      setPdfName(pdfName)
+      setCurrentPage(currentPage || 1)
+    })
+
+    socketRef.current.on('student:change_page', ({ currentPage }) => {
+      setCurrentPage(currentPage)
     })
 
     socketRef.current.on('student:sync_mode', (mode) => {
@@ -1511,7 +1535,7 @@ export default function StudentDashboard() {
                   </div>
 
                   <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center">
-                    {!liveMaterial && activeMode !== 'whiteboard' ? (
+                    {!isJoined ? (
                       <div className="text-center space-y-6 my-16 max-w-md w-full">
                         <div className="w-16 h-16 rounded-full bg-[#121a15] border border-white/[0.05] mx-auto flex items-center justify-center">
                           <HiOutlineSparkles size={28} className="text-emerald-500/50" />
@@ -1547,7 +1571,7 @@ export default function StudentDashboard() {
                         </div>
                       </div>
                     ) : activeMode === 'whiteboard' ? (
-                      <div className="w-full h-full bg-[#080b09]/80 border border-emerald-500/20 p-4 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.08)] backdrop-blur-md flex flex-col">
+                      <div className="w-full h-full bg-[#080b09]/80 border border-emerald-500/20 p-4 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.08)] backdrop-blur-md flex flex-col animate-fadeIn">
                         <div className="mb-4 flex items-center justify-between border-b border-white/[0.05] pb-4">
                           <h3 className="text-xl font-extrabold text-white font-space">Live Whiteboard Sync</h3>
                           <p className="text-xs text-emerald-400 uppercase tracking-widest mt-1 font-bold">Watch Professor Live</p>
@@ -1559,8 +1583,36 @@ export default function StudentDashboard() {
                           />
                         </div>
                       </div>
-                    ) : (
-                      <div className="w-full bg-[#080b09]/80 border border-emerald-500/20 p-8 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.08)] backdrop-blur-md">
+                    ) : pdfUrl ? (
+                      <div className="w-full h-full bg-[#080b09]/80 border border-emerald-500/20 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.08)] backdrop-blur-md flex flex-col overflow-hidden animate-fadeIn">
+                        <div className="px-5 py-3.5 flex items-center justify-between border-b border-white/[0.05] bg-[#0b100d] shrink-0 text-xs text-gray-300">
+                          <div className="flex items-center gap-3">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" strokeWidth="2.5">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            <span className="font-extrabold font-space truncate max-w-[150px] sm:max-w-xs text-white">{pdfName}</span>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <span className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded text-[10px] text-emerald-400 font-extrabold font-space uppercase">
+                              Slide Page {currentPage}
+                            </span>
+                            <span className="text-[9px] font-black tracking-widest text-[#10b981] bg-[#10b981]/15 px-2.5 py-1 rounded uppercase font-space border border-[#10b981]/30">
+                              Synced Live
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex-1 w-full bg-[#181c19] overflow-hidden min-h-[400px]">
+                          <iframe 
+                            src={`${pdfUrl}#page=${currentPage}`} 
+                            className="w-full h-full border-none bg-white" 
+                            title="Synced PDF Document"
+                          />
+                        </div>
+                      </div>
+                    ) : liveMaterial ? (
+                      <div className="w-full bg-[#080b09]/80 border border-emerald-500/20 p-8 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.08)] backdrop-blur-md animate-fadeIn">
                         <div className="mb-8 border-b border-white/[0.05] pb-4">
                           <h3 className="text-xl font-extrabold text-white font-space">{liveMaterial.title}</h3>
                           <p className="text-xs text-emerald-400 uppercase tracking-widest mt-1 font-bold">Interactive {liveMaterial.type}</p>
@@ -1609,6 +1661,25 @@ export default function StudentDashboard() {
                             <p className="text-gray-300 font-mono text-sm break-words whitespace-pre-wrap">{JSON.stringify(liveMaterial.content, null, 2)}</p>
                           </div>
                         )}
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-6 my-16 max-w-md w-full bg-[#080b09]/80 border border-emerald-500/10 p-8 rounded-2xl shadow-xl backdrop-blur-md animate-fadeIn">
+                        <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+                          <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ping" />
+                          <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/35 flex items-center justify-center text-emerald-400">
+                            <HiOutlineSparkles size={24} className="animate-pulse" />
+                          </div>
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-white font-space">Classroom is Live</h3>
+                          <p className="text-sm text-gray-400 mt-2 font-semibold">
+                            Connected to Flight Deck. Waiting for the Professor to present slides or start whiteboard.
+                          </p>
+                        </div>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Lobby Sync Active</span>
+                        </div>
                       </div>
                     )}
                   </div>

@@ -1360,6 +1360,15 @@ function FeatureWorkspace({ tabId, menuItem }) {
 
 function LiveFlightDeck({ socketRef, deckUid, handleAddStudentByUid, digitizedResult, setActiveTab, students, setStudents, pushWorksheetToClass, deployedMaterial, setDeployedMaterial, handleAddStudent }) {
   const [activeMode, setActiveMode] = useState('presentation') // 'presentation' | 'whiteboard'
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const handlePageChange = (page) => {
+    if (page < 1) return
+    setCurrentPage(page)
+    if (socketRef && socketRef.current) {
+      socketRef.current.emit('teacher:change_page', { currentPage: page })
+    }
+  }
 
   useEffect(() => {
     if (socketRef && socketRef.current) {
@@ -1397,12 +1406,44 @@ function LiveFlightDeck({ socketRef, deckUid, handleAddStudentByUid, digitizedRe
     }
   }
 
-  const loadPdf = (file) => {
+  const loadPdf = async (file) => {
     setIsUploading(true)
-    const objectUrl = URL.createObjectURL(file)
-    setPdfUrl(objectUrl)
-    setPdfName(file.name)
-    setIsUploading(false)
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const token = JSON.parse(savedInfo).token
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/class/upload-pdf`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const fullUrl = `${API_URL}${data.url}`
+        setPdfUrl(fullUrl)
+        setPdfName(file.name)
+        setCurrentPage(1)
+        
+        // Sync PDF to student side via socket
+        if (socketRef.current) {
+          socketRef.current.emit('teacher:sync_pdf', { pdfUrl: fullUrl, pdfName: file.name, currentPage: 1 })
+        }
+      } else {
+        alert('Failed to upload PDF to server.')
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Error uploading PDF to server.')
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const canvasRef = useRef(null)
@@ -1827,13 +1868,34 @@ function LiveFlightDeck({ socketRef, deckUid, handleAddStudentByUid, digitizedRe
                       </svg>
                       <span className="font-extrabold font-space truncate max-w-[150px] sm:max-w-xs text-white">{pdfName}</span>
                     </div>
+
+                    {/* Page navigation controls */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage <= 1}
+                        className="px-2.5 py-1 bg-white/5 border border-white/10 hover:bg-white/10 rounded-md text-xs text-gray-300 disabled:opacity-40 transition-all font-bold"
+                      >
+                        Prev
+                      </button>
+                      <span className="text-white font-black font-space px-2">Page {currentPage}</span>
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        className="px-2.5 py-1 bg-white/5 border border-white/10 hover:bg-white/10 rounded-md text-xs text-gray-300 transition-all font-bold"
+                      >
+                        Next
+                      </button>
+                    </div>
                     
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => {
-                          URL.revokeObjectURL(pdfUrl);
                           setPdfUrl(null);
                           setPdfName('');
+                          setCurrentPage(1);
+                          if (socketRef.current) {
+                            socketRef.current.emit('teacher:sync_pdf', { pdfUrl: null, pdfName: '', currentPage: 1 });
+                          }
                         }}
                         className="px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/5 text-[10px] text-red-400 hover:bg-red-500/10 transition-colors font-bold font-space"
                       >
@@ -1848,7 +1910,7 @@ function LiveFlightDeck({ socketRef, deckUid, handleAddStudentByUid, digitizedRe
                   {/* PDF Document Viewport (Actual Iframe) */}
                   <div className="flex-1 w-full bg-[#181c19] overflow-hidden h-full">
                     <iframe 
-                      src={pdfUrl} 
+                      src={`${pdfUrl}#page=${currentPage}`} 
                       className="w-full h-full border-none bg-white" 
                       title="Lecture PDF Document"
                     />

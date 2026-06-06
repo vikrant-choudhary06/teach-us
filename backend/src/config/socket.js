@@ -228,26 +228,45 @@ export const initSocket = (server) => {
 
     // ── LIVE FLIGHT DECK SYNC ──
     socket.on('teacher:start_deck', ({ deckUid }) => {
-      activeDecks[deckUid] = socket.id;
+      activeDecks[deckUid] = {
+        teacherSocketId: socket.id,
+        activeMode: 'presentation',
+        pdfUrl: null,
+        pdfName: '',
+        currentPage: 1,
+        liveMaterial: null
+      };
       socket.join(`deck_${deckUid}`);
       socket.deckUid = deckUid;
       console.log(`[Socket] Teacher started flight deck with PIN: ${deckUid}`);
     });
 
     socket.on('student:join_deck', ({ deckUid, studentDetails }) => {
-      if (activeDecks[deckUid]) {
+      const deck = activeDecks[deckUid];
+      if (deck) {
         socket.join(`deck_${deckUid}`);
+        socket.deckUid = deckUid;
         // Notify the teacher who started this deck
-        io.to(activeDecks[deckUid]).emit('teacher:student_joined', studentDetails);
+        io.to(deck.teacherSocketId).emit('teacher:student_joined', studentDetails);
         socket.emit('student:join_success', { deckUid });
-        console.log(`[Socket] Student joined flight deck ${deckUid}`);
+        
+        // Immediately sync current state to this student
+        socket.emit('student:sync_state', {
+          activeMode: deck.activeMode,
+          pdfUrl: deck.pdfUrl,
+          pdfName: deck.pdfName,
+          currentPage: deck.currentPage,
+          liveMaterial: deck.liveMaterial
+        });
+        console.log(`[Socket] Student joined flight deck ${deckUid} and synced state`);
       } else {
         socket.emit('student:join_error', { message: 'Invalid Deck PIN or Deck is not active' });
       }
     });
 
     socket.on('teacher:push_material', (material) => {
-      if (socket.deckUid) {
+      if (socket.deckUid && activeDecks[socket.deckUid]) {
+        activeDecks[socket.deckUid].liveMaterial = material;
         socket.to(`deck_${socket.deckUid}`).emit('student:receive_material', material);
       } else {
         io.emit('student:receive_material', material);
@@ -272,8 +291,29 @@ export const initSocket = (server) => {
     });
 
     socket.on('teacher:sync_mode', (mode) => {
-      if (socket.deckUid) socket.to(`deck_${socket.deckUid}`).emit('student:sync_mode', mode);
+      if (socket.deckUid && activeDecks[socket.deckUid]) {
+        activeDecks[socket.deckUid].activeMode = mode;
+        socket.to(`deck_${socket.deckUid}`).emit('student:sync_mode', mode);
+      }
       console.log(`[Socket] Teacher synced mode: ${mode}`);
+    });
+
+    socket.on('teacher:sync_pdf', ({ pdfUrl, pdfName, currentPage }) => {
+      if (socket.deckUid && activeDecks[socket.deckUid]) {
+        activeDecks[socket.deckUid].pdfUrl = pdfUrl;
+        activeDecks[socket.deckUid].pdfName = pdfName;
+        activeDecks[socket.deckUid].currentPage = currentPage || 1;
+        socket.to(`deck_${socket.deckUid}`).emit('student:sync_pdf', { pdfUrl, pdfName, currentPage: currentPage || 1 });
+      }
+      console.log(`[Socket] Teacher synced PDF: ${pdfName} at page ${currentPage}`);
+    });
+
+    socket.on('teacher:change_page', ({ currentPage }) => {
+      if (socket.deckUid && activeDecks[socket.deckUid]) {
+        activeDecks[socket.deckUid].currentPage = currentPage;
+        socket.to(`deck_${socket.deckUid}`).emit('student:change_page', { currentPage });
+      }
+      console.log(`[Socket] Teacher changed page to: ${currentPage}`);
     });
 
     socket.on('teacher:add_student', (student) => {
@@ -388,6 +428,12 @@ export const initSocket = (server) => {
       if (socket.coopRoomId && coopRooms[socket.coopRoomId]) {
         socket.to(socket.coopRoomId).emit('coop:partner_disconnected');
         delete coopRooms[socket.coopRoomId];
+      }
+
+      // Handle active flight deck cleanup
+      if (socket.deckUid && activeDecks[socket.deckUid]) {
+        delete activeDecks[socket.deckUid];
+        console.log(`[Socket] Cleaned up active flight deck ${socket.deckUid} due to teacher disconnect`);
       }
 
       const { classroomId, userId } = socket;
