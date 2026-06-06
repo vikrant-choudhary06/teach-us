@@ -267,7 +267,7 @@ export default function StudentDashboard() {
     socketRef.current.on('student:added_to_flight_deck', (student) => {
       // Show notification if it's us
       if (student.email === userEmail) {
-        alert('You have been added to the Professor\\'s Live Flight Deck!')
+        alert("You have been added to the Professor's Live Flight Deck!")
       }
     })
 
