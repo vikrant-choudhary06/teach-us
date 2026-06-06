@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
+import TourGuide from '../components/TourGuide'
 import {
   HiOutlineHome,
   HiOutlineFolder,
@@ -141,8 +142,10 @@ export default function Dashboard() {
   useEffect(() => {
     localStorage.setItem('settingsTab', settingsTab)
   }, [settingsTab])
+
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [tourStartTrigger, setTourStartTrigger] = useState(0)
   const [userEmail, setUserEmail] = useState('educator@acharya.ai')
   const [userName, setUserName] = useState(() => {
     const savedName = localStorage.getItem('profile_name')
@@ -202,6 +205,20 @@ export default function Dashboard() {
     e.currentTarget.style.setProperty('--x', `${x}px`)
     e.currentTarget.style.setProperty('--y', `${y}px`)
   }
+
+  // Switch to the main overview tab when the tour is started
+  useEffect(() => {
+    if (tourStartTrigger > 0) {
+      setActiveTab('overview')
+    }
+  }, [tourStartTrigger])
+
+  useEffect(() => {
+    const hasSeen = localStorage.getItem('hasSeenTour')
+    if (!hasSeen) {
+      setActiveTab('overview')
+    }
+  }, [])
 
   const markToolUsed = (toolId) => {
     try {
@@ -770,6 +787,7 @@ export default function Dashboard() {
             setMemberSince={setMemberSince}
             userPicture={userPicture}
             setUserPicture={setUserPicture}
+            onRestartTour={() => setTourStartTrigger(prev => prev + 1)}
           />
         )
       case 'course-creator':
@@ -809,7 +827,7 @@ export default function Dashboard() {
         isSidebarCollapsed ? 'w-20 px-3' : 'w-66 lg:w-72 px-5'
       }`}>
         {/* Logo and Brand */}
-        <div className={`flex items-center gap-3 mb-6 shrink-0 relative group ${isSidebarCollapsed ? 'justify-center px-0' : 'px-2'}`}>
+        <div className={`flex items-center gap-3 mb-6 shrink-0 relative group ${isSidebarCollapsed ? 'justify-center px-0' : 'px-2'}`} data-tour="brand-logo">
           <button 
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             className="w-8 h-8 rounded-lg bg-emerald-500/5 hover:bg-emerald-500/15 border border-emerald-500/20 hover:border-emerald-500/40 flex items-center justify-center text-emerald-400 transition-all duration-300 relative group cursor-pointer shadow-[0_0_8px_rgba(16,185,129,0.05)] hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
@@ -849,7 +867,7 @@ export default function Dashboard() {
             const Icon = item.icon
             const isActive = activeTab === item.id
             return (
-              <div key={item.id} className="relative group">
+              <div key={item.id} className="relative group" data-tour={`nav-${item.id}`}>
                 <button
                   onClick={() => setActiveTab(item.id)}
                   className={`w-full flex items-center rounded-xl text-left text-sm font-bold tracking-wide font-space transition-all duration-300 ${
@@ -880,7 +898,7 @@ export default function Dashboard() {
         <div className="pt-5 border-t border-white/[0.1] space-y-4 shrink-0 mt-3">
           {/* Custom Credit System */}
           {!isSidebarCollapsed ? (
-            <div className="bg-[#0b100d]/80 border border-white/[0.06] p-4 rounded-xl shadow-inner space-y-3.5">
+            <div className="bg-[#0b100d]/80 border border-white/[0.06] p-4 rounded-xl shadow-inner space-y-3.5" data-tour="credits-panel">
               {/* Row 1 */}
               <div className="flex justify-between items-center text-xs">
                 <div className="flex items-center gap-1.5 font-bold text-white">
@@ -908,7 +926,7 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <div className="flex justify-center" title={`Credits: ${credits} / 30`}>
+            <div className="flex justify-center" title={`Credits: ${credits} / 30`} data-tour="credits-panel">
               <span className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[10px] font-black text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.1)]">
                 {credits}
               </span>
@@ -916,7 +934,7 @@ export default function Dashboard() {
           )}
 
           {/* Profile Card Wrapper */}
-          <div className="relative">
+          <div className="relative" data-tour="profile-menu">
             {/* Drop-up Menu */}
             <AnimatePresence>
               {isProfileMenuOpen && (
@@ -999,6 +1017,20 @@ export default function Dashboard() {
                         <div className="flex items-center gap-2.5">
                           <HiOutlineSupport className="text-gray-400 group-hover:text-white transition-colors" size={16} />
                           <span>Support</span>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsProfileMenuOpen(false)
+                        setTourStartTrigger(prev => prev + 1)
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-emerald-500 text-gray-700 dark:text-gray-200 hover:text-white transition-all text-xs font-semibold group cursor-pointer block text-left"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2.5">
+                          <HiOutlineSparkles className="text-gray-400 group-hover:text-white transition-colors" size={16} />
+                          <span>Product Tour</span>
                         </div>
                       </div>
                     </button>
@@ -1256,6 +1288,19 @@ export default function Dashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+      <TourGuide
+        startTrigger={tourStartTrigger}
+        onComplete={() => setTourStartTrigger(0)}
+        onStepChange={(stepIndex) => {
+          if (stepIndex === 0 || stepIndex === 1 || stepIndex === 5) {
+            setActiveTab('overview')
+          } else if (stepIndex === 2) {
+            setActiveTab('whiteboard')
+          } else if (stepIndex === 3 || stepIndex === 4) {
+            setActiveTab('flight-deck')
+          }
+        }}
+      />
     </div>
   )
 }
@@ -1279,7 +1324,7 @@ function OverviewTab({ setActiveTab, menuItems, userEmail, userName, totalTopics
       className="space-y-8"
     >
       {/* Title block */}
-      <div>
+      <div data-tour="dashboard-title" className="w-fit">
         <h2 className="text-2xl md:text-3xl font-black font-space tracking-tight text-white leading-none">
           Welcome Back, <span className="text-emerald-400 font-bold">{userName || userEmail}</span>
         </h2>
@@ -1477,12 +1522,26 @@ function LiveFlightDeck({
   };
 
   const renderJoinedStudents = (fullHeight = false) => (
-    <div className={`border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-0 ${fullHeight ? 'flex-1' : 'h-[190px] shrink-0'}`}>
+    <div className={`border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-0 ${fullHeight ? 'flex-1' : 'h-[190px] shrink-0'}`} data-tour="flight-deck-seating">
       <div className="flex justify-between items-center pb-2.5 border-b border-white/[0.06] shrink-0">
         <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space flex items-center gap-2">
           <span>Joined Students</span>
           <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono text-[10px]">{joinedStudents.length}</span>
         </h4>
+        <button
+          type="button"
+          onClick={() => {
+            const name = prompt("Enter Student's Full Name:")
+            if (!name) return
+            const email = prompt("Enter Student's Email:")
+            if (!email) return
+            handleAddStudent(name, email)
+          }}
+          className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold rounded transition-colors font-space shrink-0 cursor-pointer"
+          data-tour="flight-deck-add-student"
+        >
+          + Add Student
+        </button>
       </div>
       
       <div className="mt-3 overflow-y-auto flex-1 pr-1 space-y-2 custom-sidebar-scroll">
@@ -2618,7 +2677,7 @@ function InteractiveWhiteboard({
           )}
 
           {/* Interactive Canvas */}
-          <div className="flex-1 w-full h-full relative cursor-crosshair overflow-hidden select-none">
+          <div className="flex-1 w-full h-full relative cursor-crosshair overflow-hidden select-none" data-tour="flight-deck-presentation">
             <canvas
               ref={canvasRef}
               onMouseDown={handleMouseDown}
@@ -4739,7 +4798,8 @@ export function SettingsView({
   memberSince,
   setMemberSince,
   userPicture,
-  setUserPicture
+  setUserPicture,
+  onRestartTour
 }) {
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -5250,6 +5310,7 @@ export function SettingsView({
                   type="button"
                   onClick={() => {
                     showToast('Starting system tour...', 'info')
+                    if (onRestartTour) onRestartTour()
                   }}
                   className="px-4 py-2 bg-black border border-white/10 hover:border-white/20 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
                 >
