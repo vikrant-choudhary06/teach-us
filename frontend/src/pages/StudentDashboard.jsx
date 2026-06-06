@@ -258,6 +258,16 @@ export default function StudentDashboard() {
       triggerVictory()
     })
 
+    socketRef.current.on('student:join_success', ({ deckUid }) => {
+      alert(`Successfully joined Professor's Deck: ${deckUid}`)
+      // Clear out material to show waiting state
+      setLiveMaterial(null)
+    })
+
+    socketRef.current.on('student:join_error', ({ message }) => {
+      alert(`Join failed: ${message}`)
+    })
+
     socketRef.current.on('student:receive_material', (material) => {
       setLiveMaterial(material)
       setActiveTab('live-class')
@@ -1426,12 +1436,39 @@ export default function StudentDashboard() {
 
                   <div className="relative z-10 w-full flex flex-col items-center justify-center">
                     {!liveMaterial ? (
-                      <div className="text-center space-y-4 my-20">
+                      <div className="text-center space-y-6 my-16 max-w-md w-full">
                         <div className="w-16 h-16 rounded-full bg-[#121a15] border border-white/[0.05] mx-auto flex items-center justify-center">
                           <HiOutlineSparkles size={28} className="text-emerald-500/50" />
                         </div>
-                        <h3 className="text-lg font-bold text-gray-300">Waiting for Professor...</h3>
-                        <p className="text-sm text-gray-500">Materials will appear here automatically when deployed.</p>
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-200">Join Live Flight Deck</h3>
+                          <p className="text-sm text-gray-500 mt-1">Enter the 6-digit Deck PIN provided by your Professor.</p>
+                        </div>
+                        <div className="flex gap-2">
+                           <input 
+                              id="deck-pin-input"
+                              type="text" 
+                              placeholder="e.g. 123456" 
+                              maxLength={6}
+                              className="w-full bg-[#0a0f0c] border border-emerald-500/20 focus:border-emerald-500/60 rounded-xl px-4 py-3 text-white text-center font-mono font-bold tracking-[0.25em] outline-none placeholder:tracking-normal placeholder:text-gray-600 placeholder:font-sans"
+                           />
+                           <button
+                             onClick={() => {
+                               const pin = document.getElementById('deck-pin-input').value;
+                               if(pin && pin.length === 6 && socketRef.current) {
+                                  socketRef.current.emit('student:join_deck', { deckUid: pin, studentDetails: { name: userName, email: userEmail, uid: userUid } });
+                               } else {
+                                  alert("Please enter a valid 6-digit Deck PIN.");
+                               }
+                             }}
+                             className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-space rounded-xl transition-colors shrink-0"
+                           >
+                             Join
+                           </button>
+                        </div>
+                        <div className="pt-4 border-t border-white/[0.05]">
+                           <p className="text-xs text-emerald-500/60 font-bold uppercase tracking-widest">Waiting for materials...</p>
+                        </div>
                       </div>
                     ) : (
                       <div className="w-full bg-[#080b09]/80 border border-emerald-500/20 p-8 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.08)] backdrop-blur-md">

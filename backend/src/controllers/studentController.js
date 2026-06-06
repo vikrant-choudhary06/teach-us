@@ -3,7 +3,33 @@ import User from '../models/User.js';
 import Attendance from '../models/Attendance.js';
 import Gradebook from '../models/Gradebook.js';
 
+export const addStudentByUid = async (req, res) => {
+  const { uid, classroom } = req.body;
+  try {
+    const user = await User.findOne({ uid, role: 'Student' });
+    if (!user) {
+      return res.status(404).json({ message: 'Student with this UID not found' });
+    }
 
+    // Check if student is already in teacher's roster
+    const existing = await Student.findOne({ email: user.email, teacherId: req.user._id });
+    if (existing) {
+      return res.status(400).json({ message: 'Student is already in your class' });
+    }
+
+    const student = await Student.create({
+      name: user.name,
+      email: user.email,
+      parentId: null, 
+      teacherId: req.user._id,
+      classroom: classroom || 'General',
+    });
+
+    res.status(201).json(student);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 
 export const createStudent = async (req, res) => {

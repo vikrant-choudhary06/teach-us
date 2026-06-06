@@ -6,6 +6,7 @@ const classroomQueues = {};
 const coopRooms = {};
 const matchmakingQueue = [];
 const onlineUsers = {};
+const activeDecks = {};
 
 export const initSocket = (server) => {
   const io = new Server(server, {
@@ -226,9 +227,33 @@ export const initSocket = (server) => {
     });
 
     // ── LIVE FLIGHT DECK SYNC ──
+    socket.on('teacher:start_deck', ({ deckUid }) => {
+      activeDecks[deckUid] = socket.id;
+      socket.join(`deck_${deckUid}`);
+      socket.deckUid = deckUid;
+      console.log(`[Socket] Teacher started flight deck with PIN: ${deckUid}`);
+    });
+
+    socket.on('student:join_deck', ({ deckUid, studentDetails }) => {
+      if (activeDecks[deckUid]) {
+        socket.join(`deck_${deckUid}`);
+        // Notify the teacher who started this deck
+        io.to(activeDecks[deckUid]).emit('teacher:student_joined', studentDetails);
+        socket.emit('student:join_success', { deckUid });
+        console.log(`[Socket] Student joined flight deck ${deckUid}`);
+      } else {
+        socket.emit('student:join_error', { message: 'Invalid Deck PIN or Deck is not active' });
+      }
+    });
+
     socket.on('teacher:push_material', (material) => {
-      // Broadcast material to all students
-      io.emit('student:receive_material', material);
+      if (socket.deckUid) {
+        // Send only to students in this specific deck
+        socket.to(`deck_${socket.deckUid}`).emit('student:receive_material', material);
+      } else {
+        // Fallback broadcast
+        io.emit('student:receive_material', material);
+      }
       console.log(`[Socket] Teacher pushed material: ${material?.title || 'Unknown'}`);
     });
 

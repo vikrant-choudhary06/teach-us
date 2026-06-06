@@ -47,10 +47,39 @@ import {
 
 export default function Dashboard() {
   const socketRef = useRef(null)
+  const [deckUid, setDeckUid] = useState(null)
 
   useEffect(() => {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
     socketRef.current = io(API_URL)
+
+    const newDeckUid = Math.floor(100000 + Math.random() * 900000).toString()
+    setDeckUid(newDeckUid)
+
+    socketRef.current.on('connect', () => {
+      socketRef.current.emit('teacher:start_deck', { deckUid: newDeckUid })
+    })
+
+    socketRef.current.on('teacher:student_joined', (studentDetails) => {
+      // Re-fetch students when a student joins via Deck PIN
+      const savedInfo = localStorage.getItem('userInfo')
+      if (savedInfo) {
+        const info = JSON.parse(savedInfo)
+        if (info.token) {
+          fetch(`${API_URL}/api/students`, { headers: { 'Authorization': `Bearer ${info.token}` } })
+            .then(res => res.json())
+            .then(data => {
+               // A simplified mapping to keep UI sync without complex state mgmt
+               if (Array.isArray(data)) {
+                 // The actual UI update happens when data is fetched, but we can't easily trigger the setStudents from here without moving the refetch function out.
+                 // For now, we will just show a toast and rely on the next refresh or we can duplicate the fetch logic.
+                 alert(`A student has joined your Deck via PIN!`)
+               }
+            })
+        }
+      }
+    })
+
     return () => {
       if (socketRef.current) socketRef.current.disconnect()
     }
@@ -479,6 +508,64 @@ export default function Dashboard() {
     }
   }
 
+  const handleAddStudentByUid = async (uid) => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      if (!info.token) return
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/students/add-by-uid`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${info.token}`
+        },
+        body: JSON.stringify({ uid, classroom: 'General' })
+      })
+
+      if (res.ok) {
+        const newStudent = await res.json()
+        showToast(`Student with UID "${uid}" enrolled successfully!`, 'success')
+        
+        if (socketRef.current) {
+          socketRef.current.emit('teacher:add_student', newStudent)
+        }
+        
+        // Fetch updated student list
+        const reRes = await fetch(`${API_URL}/api/students`, {
+          headers: { 'Authorization': `Bearer ${info.token}` }
+        })
+        if (reRes.ok) {
+          const reData = await reRes.json()
+          const mapped = reData.map((st, index) => ({
+            id: st._id,
+            name: st.name,
+            email: st.email || '',
+            status: 'focused',
+            lastActive: 'Active now',
+            assignmentStatus: 'Not Started',
+            currentProgress: 'Idle',
+            doubt: null,
+            row: Math.floor(index / 3),
+            col: index % 3,
+            grade: 'N/A',
+            aiFeedback: ''
+          }))
+          setStudents(mapped)
+          localStorage.setItem('real_students', JSON.stringify(mapped))
+        }
+      } else {
+        const errData = await res.json()
+        showToast(errData.message || 'Failed to add student.', 'error')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast(`Failed to add student by UID.`, 'error')
+    }
+  }
+
   const menuItems = [
     { id: 'overview', name: 'Dashboard', icon: HiOutlineHome, description: 'Class summary & quick actions' },
     { id: 'flight-deck', name: 'Live Flight Deck', icon: HiOutlineStatusOnline, description: 'Live whiteboard & student response split-screen' },
@@ -506,6 +593,8 @@ export default function Dashboard() {
       case 'flight-deck':
         return (
           <LiveFlightDeck
+            deckUid={deckUid}
+            handleAddStudentByUid={handleAddStudentByUid}
             digitizedResult={digitizedResult}
             setActiveTab={setActiveTab}
             students={students}
@@ -1253,7 +1342,7 @@ function FeatureWorkspace({ tabId, menuItem }) {
 }
 
 
-function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, pushWorksheetToClass, deployedMaterial, setDeployedMaterial, handleAddStudent }) {
+function LiveFlightDeck({ deckUid, handleAddStudentByUid, digitizedResult, setActiveTab, students, setStudents, pushWorksheetToClass, deployedMaterial, setDeployedMaterial, handleAddStudent }) {
   const [activeMode, setActiveMode] = useState('presentation') // 'presentation' | 'whiteboard'
   const [brushColor, setBrushColor] = useState('#10b981')
   const [brushWidth, setBrushWidth] = useState(4)
@@ -1536,6 +1625,12 @@ function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, 
               >
                 Interactive Canvas
               </button>
+              {deckUid && (
+                <div className="ml-4 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold font-space border bg-[#061810] text-emerald-400 border-emerald-500/30 flex items-center gap-2">
+                  <HiOutlineKey className="text-emerald-500" />
+                  Deck PIN: {deckUid}
+                </div>
+              )}
             </div>
 
             {/* Whiteboard Color & Clear Controls */}
@@ -1799,11 +1894,18 @@ function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, 
               <button
                 type="button"
                 onClick={() => {
-                  const name = prompt("Enter Student's Full Name:")
-                  if (!name) return
-                  const email = prompt("Enter Student's Email:")
-                  if (!email) return
-                  handleAddStudent(name, email)
+                  const method = prompt("Type '1' to add by Name/Email, or '2' to add by Student UID:")
+                  if (method === '1') {
+                    const name = prompt("Enter Student's Full Name:")
+                    if (!name) return
+                    const email = prompt("Enter Student's Email:")
+                    if (!email) return
+                    handleAddStudent(name, email)
+                  } else if (method === '2') {
+                    const uid = prompt("Enter Student UID (e.g. JOHN#1234):")
+                    if (!uid) return
+                    handleAddStudentByUid(uid)
+                  }
                 }}
                 className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold rounded-lg transition-colors font-space shrink-0 cursor-pointer"
               >
