@@ -117,6 +117,7 @@ export default function StudentDashboard() {
 
   // Live Class / Flight Deck Sync state
   const [liveMaterial, setLiveMaterial] = useState(null)
+  const [activeMode, setActiveMode] = useState('presentation')
 
   // Synced drawing board states
   const canvasRef = useRef(null)
