@@ -15,7 +15,9 @@ router.route('/profile')
   .put(protect, updateUserProfile);
 
 router.route('/social/friends')
-  .get(protect, getFriends)
+  .get(protect, getFriends);
+
+router.route('/social/friends/request')
   .post(protect, sendFriendRequest);
 
 router.route('/social/friends/request/:id')
