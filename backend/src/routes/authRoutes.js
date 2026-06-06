@@ -1,5 +1,6 @@
 import express from 'express';
 import { registerUser, loginUser, getUserProfile, updateUserProfile, googleLogin, verifyOTP, resendOTP } from '../controllers/authController.js';
+import { getFriends, sendFriendRequest, respondFriendRequest } from '../controllers/socialController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -12,5 +13,12 @@ router.post('/resend-otp', resendOTP);
 router.route('/profile')
   .get(protect, getUserProfile)
   .put(protect, updateUserProfile);
+
+router.route('/social/friends')
+  .get(protect, getFriends)
+  .post(protect, sendFriendRequest);
+
+router.route('/social/friends/request/:id')
+  .put(protect, respondFriendRequest);
 
 export default router;

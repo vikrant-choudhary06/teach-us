@@ -111,12 +111,20 @@ export const loginUser = async (req, res) => {
         });
       }
 
+      if (user.role === 'Student' && !user.uid) {
+        const cleanName = user.name.replace(/\s+/g, '').toUpperCase();
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        user.uid = `${cleanName}#${randomSuffix}`;
+        await user.save();
+      }
+
       res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         picture: user.picture,
+        uid: user.uid,
         token: generateToken(user._id),
       });
     } else {
@@ -167,6 +175,7 @@ export const updateUserProfile = async (req, res) => {
       email: updatedUser.email,
       role: updatedUser.role,
       picture: updatedUser.picture,
+      uid: updatedUser.uid,
       subjectsTaught: updatedUser.subjectsTaught,
       experience: updatedUser.experience,
       qualification: updatedUser.qualification,
@@ -212,6 +221,12 @@ export const googleLogin = async (req, res) => {
         user.picture = picture;
         updated = true;
       }
+      if (user.role === 'Student' && !user.uid) {
+        const cleanName = user.name.replace(/\s+/g, '').toUpperCase();
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        user.uid = `${cleanName}#${randomSuffix}`;
+        updated = true;
+      }
       if (updated) {
         await user.save();
       }
@@ -238,6 +253,7 @@ export const googleLogin = async (req, res) => {
       email: user.email,
       role: user.role,
       picture: user.picture,
+      uid: user.uid,
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -293,6 +309,7 @@ export const verifyOTP = async (req, res) => {
       email: user.email,
       role: user.role,
       picture: user.picture,
+      uid: user.uid,
       token: generateToken(user._id),
       message: 'Account verified successfully!'
     });

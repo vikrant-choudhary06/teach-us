@@ -78,6 +78,7 @@ export default function StudentDashboard() {
   const [userName, setUserName] = useState('Student')
   const [userPicture, setUserPicture] = useState('')
   const [userId, setUserId] = useState('')
+  const [userUid, setUserUid] = useState('')
   const [credits, setCredits] = useState(30)
   const [courses, setCourses] = useState(defaultCourses)
 
@@ -104,6 +105,16 @@ export default function StudentDashboard() {
   const [isPartnerReady, setIsPartnerReady] = useState(false)
   const [creditsAwarded, setCreditsAwarded] = useState(false)
 
+  // Social & Invite System states
+  const [friends, setFriends] = useState([])
+  const [pendingIncoming, setPendingIncoming] = useState([])
+  const [pendingOutgoing, setPendingOutgoing] = useState([])
+  const [addFriendInput, setAddFriendInput] = useState('')
+  const [activeSocialTab, setActiveSocialTab] = useState('friends')
+  const [onlineStatuses, setOnlineStatuses] = useState({})
+  const [activeInvite, setActiveInvite] = useState(null)
+  const [inviteTimer, setInviteTimer] = useState(15)
+
   // Synced drawing board states
   const canvasRef = useRef(null)
   const [isDrawing, setIsDrawing] = useState(false)
@@ -127,6 +138,7 @@ export default function StudentDashboard() {
         const info = JSON.parse(savedInfo)
         setUserName(info.name || 'Student')
         setUserId(info._id || '')
+        setUserUid(info.uid || '')
         if (info.picture) setUserPicture(info.picture)
         if (info.credits !== undefined) setCredits(info.credits)
         token = info.token
@@ -147,12 +159,21 @@ export default function StudentDashboard() {
         if (res.ok) {
           const data = await res.json()
           if (data.credits !== undefined) setCredits(data.credits)
+          if (data.uid) {
+            setUserUid(data.uid)
+            // Save to userInfo local store
+            const currentInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+            localStorage.setItem('userInfo', JSON.stringify({ ...currentInfo, uid: data.uid }))
+          }
         }
       } catch (e) {
         console.error(e)
       }
     }
     fetchProfile()
+
+    // Fetch friends list on dashboard load
+    fetchFriendsList(token)
 
     // Fetch Branching Courses from Database
     const fetchCourses = async () => {
@@ -179,6 +200,22 @@ export default function StudentDashboard() {
 
     socketRef.current.on('connect', () => {
       console.log('Socket client connected:', socketRef.current.id)
+      if (userId) {
+        socketRef.current.emit('social:join_lobby', { userId, userName })
+      }
+    })
+
+    socketRef.current.on('social:user_online', ({ userId: onlineId }) => {
+      setOnlineStatuses((prev) => ({ ...prev, [onlineId]: true }))
+    })
+
+    socketRef.current.on('social:user_offline', ({ userId: offlineId }) => {
+      setOnlineStatuses((prev) => ({ ...prev, [offlineId]: false }))
+    })
+
+    socketRef.current.on('coop:invite_received', ({ requesterName, requesterId, roomId, courseId }) => {
+      setActiveInvite({ requesterName, requesterId, roomId, courseId })
+      setInviteTimer(15)
     })
 
     socketRef.current.on('coop:matched', ({ roomId, partnerName, partnerId }) => {
@@ -223,7 +260,28 @@ export default function StudentDashboard() {
         socketRef.current.disconnect()
       }
     }
-  }, [])
+  }, [userId])
+
+  // Triggers lobby socket join when userId loads asynchronously
+  useEffect(() => {
+    if (userId && socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('social:join_lobby', { userId, userName })
+      fetchFriendsList()
+    }
+  }, [userId])
+
+  // Direct Session invitation timeout loop
+  useEffect(() => {
+    let interval = null
+    if (activeInvite && inviteTimer > 0) {
+      interval = setInterval(() => {
+        setInviteTimer((prev) => prev - 1)
+      }, 1000)
+    } else if (inviteTimer === 0 && activeInvite) {
+      setActiveInvite(null)
+    }
+    return () => clearInterval(interval)
+  }, [activeInvite, inviteTimer])
 
   // Video URL sync when course or playState changes
   useEffect(() => {
@@ -253,6 +311,129 @@ export default function StudentDashboard() {
     }
     return () => clearInterval(interval)
   }, [isQuizOpen, quizTimer])
+
+  // Fetch accepted friends & requests lists
+  const fetchFriendsList = async (customToken = null) => {
+    try {
+      let token = customToken
+      if (!token) {
+        const savedInfo = localStorage.getItem('userInfo')
+        if (!savedInfo) return
+        token = JSON.parse(savedInfo).token
+      }
+      if (!token) return
+
+      const res = await fetch(`${API_URL}/api/auth/social/friends`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setFriends(data.friends || [])
+        setPendingIncoming(data.pendingIncoming || [])
+        setPendingOutgoing(data.pendingOutgoing || [])
+
+        // Query status for friends
+        const friendIds = (data.friends || []).map((f) => f._id)
+        if (friendIds.length > 0 && socketRef.current) {
+          socketRef.current.emit('social:check_online', { friendIds }, (statuses) => {
+            setOnlineStatuses(statuses || {})
+          })
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  // Send request by tag UID
+  const handleSendFriendRequest = async (e) => {
+    e.preventDefault()
+    if (!addFriendInput.trim()) return
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const token = JSON.parse(savedInfo).token
+
+      const res = await fetch(`${API_URL}/api/auth/social/friends/request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ uid: addFriendInput.trim() })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        alert(data.message || 'Friend request sent!')
+        setAddFriendInput('')
+        fetchFriendsList()
+      } else {
+        alert(data.message || 'Failed to send request.')
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // Respond Friendship
+  const handleRespondFriendRequest = async (friendshipId, status) => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const token = JSON.parse(savedInfo).token
+
+      const res = await fetch(`${API_URL}/api/auth/social/friends/request/${friendshipId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status })
+      })
+      if (res.ok) {
+        fetchFriendsList()
+      } else {
+        const data = await res.json()
+        alert(data.message || 'Error responding to request')
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // Send Direct Invitation to Friend
+  const handleInviteFriend = (friendId) => {
+    if (socketRef.current) {
+      socketRef.current.emit('coop:invite_friend', { friendId, courseId: 'all-coop-course' })
+      alert('Invite sent! Waiting for friend response.')
+    }
+  }
+
+  // Accept Direct Invite
+  const handleAcceptInvite = () => {
+    if (activeInvite && socketRef.current) {
+      socketRef.current.emit('coop:accept_invite', {
+        roomId: activeInvite.roomId,
+        requesterId: activeInvite.requesterId
+      })
+      setRoomId(activeInvite.roomId)
+      setPartnerInfo({ name: activeInvite.requesterName, id: activeInvite.requesterId })
+      setCoopStatus('matched')
+      setChatMessages([
+        {
+          sender: 'System',
+          role: 'System',
+          text: `Joined session started by ${activeInvite.requesterName}!`,
+          timestamp: new Date().toLocaleTimeString()
+        }
+      ])
+      setActiveInvite(null)
+    }
+  }
+
+  const handleDeclineInvite = () => {
+    setActiveInvite(null)
+  }
 
   // Canvas drawing functionality
   const drawOnCanvas = (x1, y1, x2, y2, color, size) => {
@@ -438,6 +619,7 @@ export default function StudentDashboard() {
     setRoomId('')
     setChatMessages([])
     setCreditsAwarded(false)
+    fetchFriendsList()
   }
 
   const handleLogout = () => {
@@ -510,7 +692,10 @@ export default function StudentDashboard() {
           </button>
 
           <button
-            onClick={() => setActiveTab('coop')}
+            onClick={() => {
+              setActiveTab('coop')
+              fetchFriendsList()
+            }}
             className={`w-full flex items-center rounded-xl text-left text-sm font-bold tracking-wide font-space transition-all duration-300 py-3 px-3.5 ${
               activeTab === 'coop'
                 ? 'text-white bg-gradient-to-r from-emerald-500/20 to-green-500/10 border border-emerald-500/40 shadow-[0_4px_12px_rgba(16,185,129,0.1)]'
@@ -564,7 +749,7 @@ export default function StudentDashboard() {
             {!isSidebarCollapsed && (
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-white truncate leading-none">{userName}</p>
-                <p className="text-[10px] font-semibold text-gray-500 truncate mt-1">Student Account</p>
+                <p className="text-[9px] font-mono font-semibold text-emerald-400 truncate mt-1">{userUid || 'Lobby...'}</p>
               </div>
             )}
             <button
@@ -874,22 +1059,141 @@ export default function StudentDashboard() {
                 className="h-full flex flex-col"
               >
                 {coopStatus === 'idle' && (
-                  <div className="flex flex-col items-center justify-center p-12 border border-white/[0.08] bg-[#070b09]/40 backdrop-blur-xl rounded-3xl text-center space-y-6 max-w-xl mx-auto mt-10">
-                    <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/35 flex items-center justify-center text-emerald-400">
-                      <HiOutlineStatusOnline size={32} />
+                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 max-w-5xl mx-auto mt-6">
+                    {/* Matchmaker Box */}
+                    <div className="lg:col-span-3 flex flex-col items-center justify-center p-8 border border-white/[0.08] bg-[#070b09]/40 backdrop-blur-xl rounded-3xl text-center space-y-5">
+                      <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/35 flex items-center justify-center text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                        <HiOutlineStatusOnline size={28} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <h3 className="text-base font-black text-white font-space">Real-Time Queue Matchmaking</h3>
+                        <p className="text-[11px] text-gray-400 leading-relaxed font-semibold max-w-sm">
+                          Search for online students studying Chapter 1. Sockets automatically pairs you, or matches you with Arya (AI Helper) if queue times exceed 6 seconds.
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleFindPartner}
+                        className="py-3 px-6 bg-gradient-to-r from-emerald-500 to-green-400 text-black text-[10px] font-black uppercase tracking-wider rounded-xl hover:scale-[1.02] transition-transform cursor-pointer"
+                      >
+                        Start Matchmaking Sonar
+                      </button>
                     </div>
-                    <div className="space-y-2">
-                      <h3 className="text-xl font-black text-white font-space">Cooperative Study Room Lobby</h3>
-                      <p className="text-xs text-gray-400 leading-relaxed font-semibold">
-                        Don't study alone! Connect to the gaming co-op server to match with a classmate studying the same chapters. Solve the interactive whiteboard task together to earn +5 daily credits!
-                      </p>
+
+                    {/* Social Widget Panel */}
+                    <div className="lg:col-span-2 border border-white/[0.08] bg-[#070b09]/40 backdrop-blur-xl rounded-3xl p-5 flex flex-col space-y-4 min-h-[300px]">
+                      <div className="flex justify-between items-center pb-2 border-b border-white/[0.06]">
+                        <span className="text-xs font-black text-white font-space">Social & Study Friends</span>
+                        <span className="text-[9px] bg-white/5 border border-white/10 px-2 py-0.5 rounded text-gray-400 font-bold font-mono">
+                          UID: {userUid || 'Lobby...'}
+                        </span>
+                      </div>
+
+                      {/* Inner social tab switches */}
+                      <div className="flex bg-white/[0.02] border border-white/[0.06] p-0.5 rounded-lg text-[10px] font-bold font-space">
+                        {['friends', 'requests', 'add'].map((tab) => (
+                          <button
+                            key={tab}
+                            onClick={() => setActiveSocialTab(tab)}
+                            className={`flex-1 text-center py-1.5 rounded-md capitalize cursor-pointer transition-all ${
+                              activeSocialTab === tab
+                                ? 'bg-emerald-500 text-black font-extrabold shadow'
+                                : 'text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            {tab === 'requests' ? `Requests (${pendingIncoming.length})` : tab}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Inner Tab contents */}
+                      <div className="flex-1 overflow-y-auto max-h-48 pr-1 text-xs scrollbar-none">
+                        {activeSocialTab === 'friends' && (
+                          <div className="space-y-2">
+                            {friends.length === 0 ? (
+                              <p className="text-gray-500 text-[10px] italic text-center py-4">No friends added yet. Add peers by UID to invite them.</p>
+                            ) : (
+                              friends.map((friend) => {
+                                const isOnline = !!onlineStatuses[friend._id];
+                                return (
+                                  <div key={friend._id} className="bg-white/[0.02] border border-white/[0.04] p-2.5 rounded-xl flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-gray-600'}`} />
+                                      <div>
+                                        <p className="text-white font-bold leading-none">{friend.name}</p>
+                                        <p className="text-[8px] text-gray-500 mt-1 font-mono">{friend.uid}</p>
+                                      </div>
+                                    </div>
+                                    {isOnline ? (
+                                      <button
+                                        onClick={() => handleInviteFriend(friend._id)}
+                                        className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/25 rounded text-[8px] font-bold transition-all cursor-pointer"
+                                      >
+                                        Invite
+                                      </button>
+                                    ) : (
+                                      <span className="text-[8px] text-gray-500 font-bold uppercase">Offline</span>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+
+                        {activeSocialTab === 'requests' && (
+                          <div className="space-y-2">
+                            {pendingIncoming.length === 0 ? (
+                              <p className="text-gray-500 text-[10px] italic text-center py-4">No pending friend requests.</p>
+                            ) : (
+                              pendingIncoming.map((req) => (
+                                <div key={req.friendshipId} className="bg-white/[0.02] border border-white/[0.04] p-2.5 rounded-xl flex items-center justify-between">
+                                  <div>
+                                    <p className="text-white font-bold leading-none">{req.name}</p>
+                                    <p className="text-[8px] text-gray-500 mt-1 font-mono">{req.uid}</p>
+                                  </div>
+                                  <div className="flex gap-1.5">
+                                    <button
+                                      onClick={() => handleRespondFriendRequest(req.friendshipId, 'accepted')}
+                                      className="px-2 py-0.5 bg-emerald-500 text-black rounded text-[8px] font-bold cursor-pointer"
+                                    >
+                                      Accept
+                                    </button>
+                                    <button
+                                      onClick={() => handleRespondFriendRequest(req.friendshipId, 'declined')}
+                                      className="px-2 py-0.5 bg-white/5 hover:bg-white/10 text-white rounded text-[8px] font-bold cursor-pointer"
+                                    >
+                                      Decline
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        {activeSocialTab === 'add' && (
+                          <form onSubmit={handleSendFriendRequest} className="space-y-2.5">
+                            <div className="space-y-1">
+                              <label className="text-[9px] text-gray-500 font-bold uppercase">Search Student UID tag</label>
+                              <input
+                                type="text"
+                                value={addFriendInput}
+                                onChange={(e) => setAddFriendInput(e.target.value)}
+                                placeholder="e.g. SANYASEN#1234"
+                                className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-white placeholder-gray-600 focus:outline-none"
+                                required
+                              />
+                            </div>
+                            <button
+                              type="submit"
+                              className="w-full py-2 bg-emerald-500 text-black font-bold text-[10px] uppercase rounded-lg cursor-pointer"
+                            >
+                              Send Friend Request
+                            </button>
+                          </form>
+                        )}
+                      </div>
                     </div>
-                    <button
-                      onClick={handleFindPartner}
-                      className="py-3.5 px-8 bg-gradient-to-r from-emerald-500 to-green-400 text-black text-xs font-black uppercase tracking-wider rounded-xl hover:scale-[1.02] transition-transform cursor-pointer"
-                    >
-                      Find a Study Partner
-                    </button>
                   </div>
                 )}
 
@@ -1074,6 +1378,46 @@ export default function StudentDashboard() {
           </AnimatePresence>
         </div>
       </main>
+
+      {/* ── REAL-TIME CO-OP SESSION INVITE POP-UP OVERLAY ── */}
+      <AnimatePresence>
+        {activeInvite && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-50 p-5 w-80 rounded-2xl border border-emerald-500/30 bg-[#070b09]/95 backdrop-blur-xl shadow-2xl flex flex-col space-y-4"
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-xs font-black uppercase text-emerald-400 tracking-wider font-space">Co-Op Invitation</span>
+              </div>
+              <span className="text-[10px] text-gray-500 font-mono font-bold">{inviteTimer}s</span>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-white leading-relaxed">
+                <strong>{activeInvite.requesterName}</strong> has invited you to join a collaborative study session!
+              </p>
+              <p className="text-[10px] text-gray-500 mt-1">Accepting will join you to their canvas workspace immediately.</p>
+            </div>
+            <div className="flex gap-2 text-xs font-bold font-space">
+              <button
+                onClick={handleAcceptInvite}
+                className="flex-1 py-2 rounded-lg bg-emerald-500 text-black cursor-pointer hover:scale-[1.02] transition-all font-extrabold"
+              >
+                Accept
+              </button>
+              <button
+                onClick={handleDeclineInvite}
+                className="flex-1 py-2 rounded-lg bg-white/5 text-gray-400 hover:text-white cursor-pointer transition-all"
+              >
+                Decline
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── MOBILE SIDEBAR DRAW NAV ── */}
       <AnimatePresence>

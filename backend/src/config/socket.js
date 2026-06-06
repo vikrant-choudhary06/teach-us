@@ -5,6 +5,7 @@ import Poll from '../models/Poll.js';
 const classroomQueues = {};
 const coopRooms = {};
 const matchmakingQueue = [];
+const onlineUsers = {};
 
 export const initSocket = (server) => {
   const io = new Server(server, {
@@ -16,6 +17,72 @@ export const initSocket = (server) => {
 
   io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
+
+    // ── SOCIAL & FRIEND INVITATION HANDLERS ──
+    socket.on('social:join_lobby', ({ userId, userName }) => {
+      socket.userId = userId;
+      socket.userName = userName;
+      onlineUsers[userId] = socket.id;
+      console.log(`[Social Socket] User ${userName} (${userId}) registered online`);
+      io.emit('social:user_online', { userId });
+    });
+
+    socket.on('social:check_online', ({ friendIds }, callback) => {
+      if (!Array.isArray(friendIds)) return;
+      const statuses = {};
+      friendIds.forEach(id => {
+        statuses[id] = !!onlineUsers[id];
+      });
+      if (typeof callback === 'function') {
+        callback(statuses);
+      } else {
+        socket.emit('social:online_statuses', statuses);
+      }
+    });
+
+    socket.on('coop:invite_friend', ({ friendId, courseId }) => {
+      const targetSocketId = onlineUsers[friendId];
+      if (targetSocketId) {
+        const inviteRoomId = `coop_invite_room_${socket.userId}_${friendId}`;
+        io.to(targetSocketId).emit('coop:invite_received', {
+          requesterName: socket.userName,
+          requesterId: socket.userId,
+          roomId: inviteRoomId,
+          courseId
+        });
+        console.log(`[Socket] Invite emitted from ${socket.userName} to friend ${friendId} in room ${inviteRoomId}`);
+      }
+    });
+
+    socket.on('coop:accept_invite', ({ roomId, requesterId }) => {
+      socket.join(roomId);
+      socket.coopRoomId = roomId;
+
+      const hostSocketId = onlineUsers[requesterId];
+      if (hostSocketId) {
+        const hostSocket = io.sockets.sockets.get(hostSocketId);
+        if (hostSocket) {
+          hostSocket.join(roomId);
+          hostSocket.coopRoomId = roomId;
+        }
+      }
+
+      coopRooms[roomId] = {
+        studentA: { userId: requesterId, userName: 'Host Friend', socketId: hostSocketId },
+        studentB: { userId: socket.userId, userName: socket.userName, socketId: socket.id },
+        isMock: false
+      };
+
+      io.to(roomId).emit('coop:matched', {
+        roomId,
+        partnerName: socket.userName,
+        partnerId: socket.userId,
+        playerA: { userId: requesterId, userName: 'Host' },
+        playerB: { userId: socket.userId, userName: socket.userName }
+      });
+      
+      console.log(`[Socket] Match established via direct invite in room ${roomId}`);
+    });
 
 
     socket.on('join_classroom', ({ classroomId, userId, name, role }) => {
@@ -295,6 +362,13 @@ export const initSocket = (server) => {
 
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.id}`);
+
+      // Handle social onlineUsers cleanup
+      if (socket.userId && onlineUsers[socket.userId] === socket.id) {
+        delete onlineUsers[socket.userId];
+        io.emit('social:user_offline', { userId: socket.userId });
+        console.log(`[Social Socket] User ${socket.userName} (${socket.userId}) is offline`);
+      }
 
       // Handle matchmaking queue cleanup
       const qIdx = matchmakingQueue.findIndex(q => q.socket.id === socket.id);
