@@ -84,7 +84,7 @@ export default function DashboardPreview() {
                 <div className="w-3 h-3 rounded-full bg-green-500/80" />
               </div>
               <span className="mx-auto text-[11px] text-gray-500 font-medium tracking-wide">
-                acharya.ai/dashboard
+                techus.in/dashboard
               </span>
             </div>
 
@@ -102,7 +102,7 @@ export default function DashboardPreview() {
                       <HiBookOpen className="text-white" size={16} />
                     </div>
                     <span className="font-bold text-sm text-gray-900 tracking-tight flex items-center gap-1">
-                      Acharya <span className="text-emerald-600">AI</span>
+                      techUs
                     </span>
                   </div>
 

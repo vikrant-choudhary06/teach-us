@@ -1,11 +1,10 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import fs from 'fs';
-
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import fs from "fs";
 
 const fileToGenerativePart = (path, mimeType) => {
   return {
     inlineData: {
-      data: Buffer.from(fs.readFileSync(path)).toString('base64'),
+      data: Buffer.from(fs.readFileSync(path)).toString("base64"),
       mimeType,
     },
   };
@@ -15,20 +14,22 @@ export const gradeHomeworkWithAI = async (filePath, rubric, mimeType) => {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    console.warn('GEMINI_API_KEY not configured. Using high-quality mock evaluation responses.');
+    console.warn(
+      "GEMINI_API_KEY not configured. Using high-quality mock evaluation responses.",
+    );
     return simulateHomeworkGrading(rubric);
   }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const imagePart = fileToGenerativePart(filePath, mimeType || 'image/jpeg');
+    const imagePart = fileToGenerativePart(filePath, mimeType || "image/jpeg");
 
     const prompt = `
       You are an expert AI Paper Grader for ClassOS.
       You are grading a student's physical handwritten homework image.
       
       Grading Rubric / Criteria:
-      ${rubric || 'Verify completeness, factual accuracy, clear explanations, and structure.'}
+      ${rubric || "Verify completeness, factual accuracy, clear explanations, and structure."}
       
       Analyze the handwritten homework in this image. Do the following:
       1. Extract all legible text (OCR).
@@ -44,46 +45,55 @@ export const gradeHomeworkWithAI = async (filePath, rubric, mimeType) => {
       Do NOT wrap the JSON inside markdown code blocks (e.g. \`\`\`json). Return ONLY the raw valid JSON string.
     `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
-    const responseText = response.text() || '';
+    const responseText = response.text() || "";
 
-
-    const jsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const jsonStr = responseText
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
     return JSON.parse(jsonStr);
   } catch (error) {
-    console.error('Gemini AI grading service error:', error);
+    console.error("Gemini AI grading service error:", error);
     return {
       score: 75,
-      extractedText: '[OCR Failed or timed out]',
-      feedback: 'Failed to process grading using Gemini API. Falling back to default grading: Please check the handwriting legibility.',
-      rubricAnalysis: 'Factual accuracy: 7/10, Completeness: 8/10',
+      extractedText: "[OCR Failed or timed out]",
+      feedback:
+        "Failed to process grading using Gemini API. Falling back to default grading: Please check the handwriting legibility.",
+      rubricAnalysis: "Factual accuracy: 7/10, Completeness: 8/10",
       error: error.message,
     };
   }
 };
 
-export const summarizeLessonWithAI = async (transcriptionText, whiteboardLogs) => {
+export const summarizeLessonWithAI = async (
+  transcriptionText,
+  whiteboardLogs,
+) => {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    console.warn('GEMINI_API_KEY not configured. Using high-quality mock lesson summarizer.');
+    console.warn(
+      "GEMINI_API_KEY not configured. Using high-quality mock lesson summarizer.",
+    );
     return simulateLessonSummary(transcriptionText);
   }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const whiteboardContext = whiteboardLogs && whiteboardLogs.length > 0
-      ? `Whiteboard strokes captured: ${JSON.stringify(whiteboardLogs.slice(0, 100))} (contains coordinates, colors, and clear events)`
-      : 'No whiteboard logs recorded.';
+    const whiteboardContext =
+      whiteboardLogs && whiteboardLogs.length > 0
+        ? `Whiteboard strokes captured: ${JSON.stringify(whiteboardLogs.slice(0, 100))} (contains coordinates, colors, and clear events)`
+        : "No whiteboard logs recorded.";
 
     const prompt = `
       You are ClassOS AI Auto-Lesson Summarizer.
       Your task is to take the audio transcription of the class lecture and whiteboard activity, and compile a beautifully formatted "Study Guide" in Markdown format for the students.
       
       Audio Lecture Transcription:
-      "${transcriptionText || 'The class discusses the core concepts of Photosynthesis, highlighting the role of chlorophyll, light dependent reactions in thylakoid membranes, and the Calvin cycle in the stroma.'}"
+      "${transcriptionText || "The class discusses the core concepts of Photosynthesis, highlighting the role of chlorophyll, light dependent reactions in thylakoid membranes, and the Calvin cycle in the stroma."}"
       
       Class whiteboard logs:
       ${whiteboardContext}
@@ -98,34 +108,32 @@ export const summarizeLessonWithAI = async (transcriptionText, whiteboardLogs) =
       Format beautifully in clean GitHub-Flavored Markdown.
     `;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text() || 'No summary could be generated.';
+    return response.text() || "No summary could be generated.";
   } catch (error) {
-    console.error('Gemini AI lesson summarizer service error:', error);
+    console.error("Gemini AI lesson summarizer service error:", error);
     return `
 # Study Guide: [Compilation failed]
 *Could not connect to Gemini AI API. Here is the raw lecture transcription digest:*
 
-${transcriptionText || 'No transcript contents available.'}
+${transcriptionText || "No transcript contents available."}
     `;
   }
 };
-
-
 
 const simulateHomeworkGrading = (rubric) => {
   const scores = [82, 88, 91, 95];
   const randomScore = scores[Math.floor(Math.random() * scores.length)];
   return {
     score: randomScore,
-    extractedText: "Title: Cellular Respiration Lab Report\n\nHypothesis: If cells are deprived of oxygen, they will switch from aerobic respiration to anaerobic fermentation, resulting in lower ATP production and accumulation of lactic acid.\n\nMethods & Observations: We incubated yeast in sugar solution and measured CO2 release. Tube A (with oxygen) showed rapid gas production. Tube B (sealed) showed slow gas bubbles.\n\nConclusion: The experiment supports the hypothesis. Aerobic respiration produces 36-38 ATP per glucose, whereas fermentation yields only 2 ATP, proving aerobic pathways are far more efficient.",
+    extractedText:
+      "Title: Cellular Respiration Lab Report\n\nHypothesis: If cells are deprived of oxygen, they will switch from aerobic respiration to anaerobic fermentation, resulting in lower ATP production and accumulation of lactic acid.\n\nMethods & Observations: We incubated yeast in sugar solution and measured CO2 release. Tube A (with oxygen) showed rapid gas production. Tube B (sealed) showed slow gas bubbles.\n\nConclusion: The experiment supports the hypothesis. Aerobic respiration produces 36-38 ATP per glucose, whereas fermentation yields only 2 ATP, proving aerobic pathways are far more efficient.",
     feedback: `Outstanding lab report! Your hypothesis is clearly stated, and you successfully linked the theoretical ATP yields (36-38 ATP vs 2 ATP) to your fermentation observations. Excellent work on the formatting. To get a perfect score, ensure you label your graph axes next time.`,
-    rubricAnalysis: `Criteria matches based on: "${rubric || 'Default Rubric'}"\n- Scientific Accuracy: 10/10\n- Experimental Setup Detail: 8.5/10\n- Logical Conclusion: 9/10\n- Graph labels: 6/10`,
+    rubricAnalysis: `Criteria matches based on: "${rubric || "Default Rubric"}"\n- Scientific Accuracy: 10/10\n- Experimental Setup Detail: 8.5/10\n- Logical Conclusion: 9/10\n- Graph labels: 6/10`,
   };
 };
-
 
 const simulateLessonSummary = (transcript) => {
   return `

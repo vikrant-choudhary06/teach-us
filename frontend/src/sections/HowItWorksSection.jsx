@@ -100,7 +100,7 @@ export default function HowItWorksSection() {
             Simple Process
           </motion.span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
-            How Acharya AI Works
+            How techUs Works
           </h2>
           <p className="text-lg text-gray-400 max-w-3xl mx-auto">
             Get started in minutes and start transforming your classroom today

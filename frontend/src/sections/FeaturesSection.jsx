@@ -28,14 +28,14 @@ const BentoCard = ({ children, className = '' }) => {
       onMouseMove={handleMouseMove}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[#070908] p-6 transition-all duration-300 hover:border-emerald-500/20 hover:shadow-emerald-500/5 shadow-2xl ${className}`}
+      className={`relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0A2019] p-6 transition-all duration-300 hover:border-brand-sage/20 hover:shadow-brand-forest/5 shadow-2xl ${className}`}
     >
       {/* Dynamic Cursor Spotlight */}
       {isHovered && (
         <div
           className="pointer-events-none absolute -inset-px transition duration-300 rounded-2xl z-0"
           style={{
-            background: `radial-gradient(280px circle at ${coords.x}px ${coords.y}px, rgba(16, 185, 129, 0.05), transparent 80%)`,
+            background: `radial-gradient(280px circle at ${coords.x}px ${coords.y}px, rgba(231, 239, 233, 0.04), transparent 80%)`,
           }}
         />
       )}
@@ -109,11 +109,11 @@ export default function FeaturesSection() {
   ];
 
   return (
-    <section id="features" className="section-padding bg-black relative overflow-hidden">
+    <section id="features" className="section-padding bg-brand-forest relative overflow-hidden">
       {/* Soft Academic Ambient Glows */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute top-[20%] left-[-15%] w-[500px] h-[500px] bg-green-955/5 rounded-full blur-[140px]" />
-        <div className="absolute bottom-[20%] right-[-15%] w-[500px] h-[500px] bg-emerald-955/5 rounded-full blur-[140px]" />
+        <div className="absolute top-[20%] left-[-15%] w-[500px] h-[500px] bg-white/5 rounded-full blur-[140px]" />
+        <div className="absolute bottom-[20%] right-[-15%] w-[500px] h-[500px] bg-brand-sage/5 rounded-full blur-[140px]" />
       </div>
 
       <div className="container-custom relative z-10 max-w-6xl">
@@ -124,14 +124,14 @@ export default function FeaturesSection() {
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-6 tracking-wide"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-brand-sage text-xs font-semibold mb-6 tracking-wide"
           >
             📚 CLASSROOM ASSISTANT
           </motion.span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 font-space max-w-3xl leading-tight">
-            Everything you need to <span className="text-emerald-400">Transform your Classroom.</span>
+            Everything you need to <span className="text-emerald-300">Transform your Classroom.</span>
           </h2>
-          <p className="text-sm text-gray-400 max-w-xl font-sans">
+          <p className="text-sm text-brand-sage/80 max-w-xl font-sans">
             Explore clean, automated assistant tools designed specifically for modern educators.
           </p>
         </div>
@@ -145,13 +145,13 @@ export default function FeaturesSection() {
               {/* Left Side */}
               <div className="flex flex-col justify-between flex-1 md:w-[55%]">
                 <div>
-                  <span className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold tracking-widest uppercase font-sans">
+                  <span className="px-2.5 py-1 rounded bg-white/10 border border-white/25 text-brand-sage text-[9px] font-bold tracking-widest uppercase font-sans">
                     Lesson Planner
                   </span>
                   <h3 className="text-xl font-bold text-white font-space mt-2">
                     Architect Lessons in Seconds.
                   </h3>
-                  <p className="text-gray-400 text-[11px] mt-1 font-sans leading-normal">
+                  <p className="text-white/75 text-[11px] mt-1 font-sans leading-normal">
                     Draft complete lesson guides. Choose a CBSE/ICSE topic below to watch the planner generate steps instantly:
                   </p>
 
@@ -163,8 +163,8 @@ export default function FeaturesSection() {
                         onClick={() => setPlannerTopic(key)}
                         className={`px-2.5 py-1 rounded-full text-[9px] font-semibold border transition-all ${
                           plannerTopic === key
-                            ? 'bg-emerald-500 border-emerald-400 text-black shadow-lg shadow-emerald-500/15'
-                            : 'border-white/10 bg-white/[0.02] text-gray-400 hover:text-white hover:bg-white/[0.05]'
+                            ? 'bg-white border-white text-brand-forest shadow-md'
+                            : 'border-white/15 bg-white/[0.04] text-white/85 hover:text-white hover:bg-white/[0.08]'
                         }`}
                       >
                         {plannerData[key].title}
@@ -176,7 +176,7 @@ export default function FeaturesSection() {
                 <div className="pt-3">
                   <Link
                     to="/login"
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-wider font-sans"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-sage hover:text-white transition-colors uppercase tracking-wider font-sans"
                   >
                     Create Custom Worksheets <HiArrowRight />
                   </Link>
@@ -184,7 +184,7 @@ export default function FeaturesSection() {
               </div>
 
               {/* Right Side: Friendly Glass Worksheet Preview */}
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-col gap-2.5 shadow-inner text-left font-sans md:w-[45%] justify-center">
+              <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4 flex flex-col gap-2.5 shadow-inner text-left font-sans md:w-[45%] justify-center">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={plannerTopic}
@@ -227,26 +227,26 @@ export default function FeaturesSection() {
           <BentoCard>
             <div className="flex flex-col justify-between h-full gap-4">
               <div>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold tracking-widest uppercase font-sans">
+                <span className="px-2 py-0.5 rounded bg-white/10 border border-white/25 text-brand-sage text-[8px] font-bold tracking-widest uppercase font-sans">
                   Slides
                 </span>
                 <h4 className="text-base font-bold text-white font-space mt-2">
                   Bring Concepts to Life.
                 </h4>
-                <p className="text-gray-400 text-[10px] mt-1 font-sans">
+                <p className="text-white/75 text-[10px] mt-1 font-sans">
                   Orbit model speed controls:
                 </p>
               </div>
 
               {/* Modern Slide Graphic with Orbit Speed control */}
-              <div className="relative h-28 bg-white/[0.02] border border-white/10 rounded-xl flex flex-col items-center justify-center p-3">
+              <div className="relative h-28 bg-white/[0.04] border border-white/15 rounded-xl flex flex-col items-center justify-center p-3">
                 <div className="relative w-14 h-14 flex items-center justify-center bg-white/[0.01] rounded-full border border-white/5">
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 10 - orbitSpeed, repeat: Infinity, ease: 'linear' }}
-                    className="absolute inset-0 border border-dashed border-emerald-500/40 rounded-full"
+                    className="absolute inset-0 border border-dashed border-brand-sage/40 rounded-full"
                   />
-                  <div className="w-6 h-6 rounded-full bg-emerald-500/10 border border-emerald-500 flex items-center justify-center text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)] z-10">
+                  <div className="w-6 h-6 rounded-full bg-white/10 border border-white/25 flex items-center justify-center text-brand-sage shadow-[0_0_10px_rgba(255,255,255,0.1)] z-10">
                     <HiPhotograph size={10} />
                   </div>
                   {/* Orbiting particle */}
@@ -255,7 +255,7 @@ export default function FeaturesSection() {
                     transition={{ duration: 8 - orbitSpeed, repeat: Infinity, ease: 'linear' }}
                     className="absolute w-14 h-14"
                   >
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-brand-sage shadow-[0_0_6px_#E7EFE9]" />
                   </motion.div>
                 </div>
 
@@ -266,14 +266,14 @@ export default function FeaturesSection() {
                     max="9"
                     value={orbitSpeed}
                     onChange={(e) => setOrbitSpeed(Number(e.target.value))}
-                    className="w-full appearance-none cursor-pointer accent-emerald-400"
+                    className="w-full appearance-none cursor-pointer accent-brand-sage"
                     style={{
                       height: '3px',
-                      background: `linear-gradient(to right, #34d399 0%, #34d399 ${((orbitSpeed - 1) / 8) * 100}%, rgba(255,255,255,0.1) ${((orbitSpeed - 1) / 8) * 100}%, rgba(255,255,255,0.1) 100%)`,
+                      background: `linear-gradient(to right, #E7EFE9 0%, #E7EFE9 ${((orbitSpeed - 1) / 8) * 100}%, rgba(255,255,255,0.1) ${((orbitSpeed - 1) / 8) * 100}%, rgba(255,255,255,0.1) 100%)`,
                       borderRadius: '999px',
                     }}
                   />
-                  <div className="flex justify-between text-[6px] text-gray-500 font-semibold mt-1 uppercase tracking-wide">
+                  <div className="flex justify-between text-[6px] text-white/50 font-semibold mt-1 uppercase tracking-wide">
                     <span>Slow</span>
                     <span>Speed: {orbitSpeed}x</span>
                     <span>Fast</span>
@@ -281,7 +281,7 @@ export default function FeaturesSection() {
                 </div>
               </div>
 
-              <div className="text-[10px] text-gray-400 font-medium font-sans">
+              <div className="text-[10px] text-white/70 font-medium font-sans">
                 Generates vector slides for physics & chemistry instantly.
               </div>
             </div>
@@ -291,13 +291,13 @@ export default function FeaturesSection() {
           <BentoCard>
             <div className="flex flex-col justify-between h-full gap-4">
               <div>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold tracking-widest uppercase font-sans">
+                <span className="px-2 py-0.5 rounded bg-white/10 border border-white/25 text-brand-sage text-[8px] font-bold tracking-widest uppercase font-sans">
                   Math
                 </span>
                 <h4 className="text-base font-bold text-white font-space mt-2">
                   Deconstruct Mathematics.
                 </h4>
-                <p className="text-gray-400 text-[10px] mt-1 font-sans">
+                <p className="text-white/75 text-[10px] mt-1 font-sans">
                   Tap to solve equations:
                 </p>
 
@@ -306,7 +306,7 @@ export default function FeaturesSection() {
                   <button
                     onClick={() => setMathTab('algebra')}
                     className={`px-3 py-1 rounded-full text-[8px] font-bold border transition-colors ${
-                      mathTab === 'algebra' ? 'bg-emerald-500 border-emerald-400 text-black' : 'border-white/10 text-gray-400 bg-white/[0.01]'
+                      mathTab === 'algebra' ? 'bg-white border-white text-brand-forest' : 'border-white/15 text-white/75 bg-white/[0.04]'
                     }`}
                   >
                     Algebra
@@ -314,7 +314,7 @@ export default function FeaturesSection() {
                   <button
                     onClick={() => setMathTab('calculus')}
                     className={`px-3 py-1 rounded-full text-[8px] font-bold border transition-colors ${
-                      mathTab === 'calculus' ? 'bg-emerald-500 border-emerald-400 text-black' : 'border-white/10 text-gray-400 bg-white/[0.01]'
+                      mathTab === 'calculus' ? 'bg-white border-white text-brand-forest' : 'border-white/15 text-white/75 bg-white/[0.04]'
                     }`}
                   >
                     Calculus
@@ -323,8 +323,8 @@ export default function FeaturesSection() {
               </div>
 
               {/* Math Solution Card */}
-              <div className="flex-1 rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-col justify-center gap-2 font-sans">
-                <div className="text-white text-xs font-bold border border-white/10 p-2 rounded bg-white/[0.01] text-center">
+              <div className="flex-1 rounded-xl border border-white/15 bg-white/[0.04] p-4 flex flex-col justify-center gap-2 font-sans">
+                <div className="text-white text-xs font-bold border border-white/15 p-2 rounded bg-white/[0.02] text-center">
                   {mathSolutions[mathTab].equation}
                 </div>
                 <div className="space-y-1.5 my-1">
@@ -334,9 +334,9 @@ export default function FeaturesSection() {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.3 }}
                       key={idx}
-                      className={idx === mathSolutions[mathTab].steps.length - 1 ? "text-emerald-400 font-bold text-[10px] flex items-center gap-1" : "text-gray-300 text-[10px]"}
+                      className={idx === mathSolutions[mathTab].steps.length - 1 ? "text-[#82e23e] font-bold text-[10px] flex items-center gap-1" : "text-white/95 text-[10px]"}
                     >
-                      {idx === mathSolutions[mathTab].steps.length - 1 && <span className="text-emerald-500">✔</span>}
+                      {idx === mathSolutions[mathTab].steps.length - 1 && <span className="text-[#82e23e]">✔</span>}
                       {step}
                     </motion.div>
                   ))}
@@ -349,13 +349,13 @@ export default function FeaturesSection() {
           <BentoCard>
             <div className="flex flex-col justify-between h-full gap-4">
               <div>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold tracking-widest uppercase font-sans">
+                <span className="px-2 py-0.5 rounded bg-white/10 border border-white/25 text-brand-sage text-[8px] font-bold tracking-widest uppercase font-sans">
                   Languages
                 </span>
                 <h4 className="text-base font-bold text-white font-space mt-2">
                   Regional Translation.
                 </h4>
-                <p className="text-gray-400 text-[10px] mt-1 font-sans">
+                <p className="text-white/75 text-[10px] mt-1 font-sans">
                   Select a language to translate:
                 </p>
 
@@ -366,7 +366,7 @@ export default function FeaturesSection() {
                       key={lang}
                       onClick={() => setTransLang(lang)}
                       className={`px-3 py-1 rounded-full text-[8px] font-bold border transition-colors ${
-                        transLang === lang ? 'bg-emerald-500 border-emerald-400 text-black' : 'border-white/10 text-gray-400 bg-white/[0.01]'
+                        transLang === lang ? 'bg-white border-white text-brand-forest' : 'border-white/15 text-white/75 bg-white/[0.04]'
                       }`}
                     >
                       {lang === 'hi' ? 'Hindi' : lang === 'te' ? 'Telugu' : 'Tamil'}
@@ -376,8 +376,8 @@ export default function FeaturesSection() {
               </div>
 
               {/* Translation sheet */}
-              <div className="flex-1 rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-col justify-center font-sans">
-                <span className="text-[7px] text-emerald-400 font-bold uppercase tracking-wider block mb-1">
+              <div className="flex-1 rounded-xl border border-white/15 bg-white/[0.04] p-4 flex flex-col justify-center font-sans">
+                <span className="text-[7px] text-brand-sage font-bold uppercase tracking-wider block mb-1">
                   🇮🇳 TRANSLATION:
                 </span>
                 <AnimatePresence mode="wait">
@@ -399,19 +399,19 @@ export default function FeaturesSection() {
           <BentoCard className="md:col-span-3">
             <div className="flex flex-col justify-between h-full gap-4">
               <div>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold tracking-widest uppercase font-sans">
+                <span className="px-2 py-0.5 rounded bg-white/10 border border-white/25 text-brand-sage text-[8px] font-bold tracking-widest uppercase font-sans">
                   Stories
                 </span>
                 <h4 className="text-xl font-bold text-white font-space mt-2">
                   Learn Through Narratives & Stories.
                 </h4>
-                <p className="text-gray-400 text-xs mt-1 font-sans">
+                <p className="text-white/75 text-xs mt-1 font-sans">
                   Generate moral-based concept stories to keep younger classes engaged:
                 </p>
               </div>
 
               {/* Storybook Mockup Sheet */}
-              <div className="flex-1 bg-white/[0.02] border border-white/10 rounded-xl p-4 flex flex-col justify-between gap-3 min-h-[100px] font-sans">
+              <div className="flex-1 bg-white/[0.04] border border-white/15 rounded-xl p-4 flex flex-col justify-between gap-3 min-h-[100px] font-sans">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={storyIndex}
@@ -421,7 +421,7 @@ export default function FeaturesSection() {
                     className="flex flex-col justify-between h-full"
                   >
                     <div>
-                      <span className="text-[8px] text-emerald-400 font-bold uppercase tracking-wider">
+                      <span className="text-[8px] text-brand-sage font-bold uppercase tracking-wider">
                         Topic: {stories[storyIndex].topic}
                       </span>
                       <p className="text-gray-200 text-xs leading-relaxed italic mt-1.5 max-w-xl">
@@ -436,13 +436,13 @@ export default function FeaturesSection() {
               <div className="flex justify-between items-center font-sans">
                 <button
                   onClick={() => setStoryIndex((prev) => (prev + 1) % stories.length)}
-                  className="px-4 py-1.5 rounded-full border border-white/10 hover:border-emerald-500/30 bg-white/[0.01] hover:bg-emerald-500/10 hover:text-emerald-400 text-gray-300 text-[10px] font-bold transition-all"
+                  className="px-4 py-1.5 rounded-full border border-white/15 hover:border-white/35 bg-white/[0.04] hover:bg-white/10 text-white text-[10px] font-bold transition-all"
                 >
                   📖 Next Story Concept
                 </button>
                 <Link
                   to="/login"
-                  className="text-xs text-emerald-400 hover:text-emerald-300 font-bold inline-flex items-center gap-1 uppercase tracking-wider"
+                  className="text-xs text-brand-sage hover:text-white font-bold inline-flex items-center gap-1 uppercase tracking-wider transition-colors"
                 >
                   Generate E-Stories <HiArrowRight />
                 </Link>
@@ -454,19 +454,19 @@ export default function FeaturesSection() {
           <BentoCard>
             <div className="flex flex-col justify-between h-full gap-4">
               <div>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-bold tracking-widest uppercase font-sans">
+                <span className="px-2 py-0.5 rounded bg-white/10 border border-white/25 text-brand-sage text-[8px] font-bold tracking-widest uppercase font-sans">
                   NCERT Files
                 </span>
                 <h4 className="text-base font-bold text-white font-space mt-2">
                   Board Syllabus Indexer.
                 </h4>
-                <p className="text-gray-400 text-[10px] mt-1 font-sans">
+                <p className="text-white/75 text-[10px] mt-1 font-sans">
                   Access textbook & guidelines repository:
                 </p>
               </div>
 
               {/* Clean Academic Index List */}
-              <div className="flex-1 rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-col justify-between gap-2 font-sans text-xs">
+              <div className="flex-1 rounded-xl border border-white/15 bg-white/[0.04] p-4 flex flex-col justify-between gap-2 font-sans text-xs">
                 <div className="space-y-2">
                   {[
                     { name: 'NCERT Math Class 10.pdf', size: '4.8 MB' },
@@ -477,11 +477,11 @@ export default function FeaturesSection() {
                         <span className="text-emerald-400 text-sm">📁</span>
                         <span className="truncate text-gray-200 font-medium">{file.name}</span>
                       </div>
-                      <span className="text-gray-500 text-[10px]">{file.size}</span>
+                      <span className="text-gray-400 text-[10px]">{file.size}</span>
                     </div>
                   ))}
                 </div>
-                <div className="text-[9px] text-emerald-400 font-bold text-center flex items-center gap-1 justify-center mt-1">
+                <div className="text-[9px] text-brand-sage font-bold text-center flex items-center gap-1 justify-center mt-1">
                   ✓ Verified Board Guidelines
                 </div>
               </div>

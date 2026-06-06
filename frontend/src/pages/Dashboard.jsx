@@ -30,7 +30,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview')
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  const [userEmail, setUserEmail] = useState('educator@acharya.ai')
+  const [userEmail, setUserEmail] = useState('educator@techus.in')
   const [userName, setUserName] = useState('Educator')
   const [isAIChatOpen, setIsAIChatOpen] = useState(false)
   const [credits, setCredits] = useState(30)
@@ -148,7 +148,7 @@ export default function Dashboard() {
           </button>
           {!isSidebarCollapsed && (
             <span className="text-lg font-extrabold tracking-tight text-white font-space flex items-center gap-1.5">
-              Acharya <span className="text-emerald-400 font-bold">AI</span>
+              techUs
             </span>
           )}
         </div>
@@ -270,7 +270,7 @@ export default function Dashboard() {
                       <HiOutlineBookOpen className="text-black" size={18} />
                     </div>
                     <span className="text-lg font-extrabold tracking-tight text-white font-space">
-                      Acharya <span className="text-emerald-400 font-bold">AI</span>
+                      techUs
                     </span>
                   </div>
                   <button
@@ -397,7 +397,7 @@ export default function Dashboard() {
             <div className="p-4 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.02]">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider font-space">Acharya Helper</span>
+                <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider font-space">techUs Helper</span>
               </div>
               <button onClick={() => setIsAIChatOpen(false)} className="text-gray-400 hover:text-white">
                 <HiOutlineX size={18} />
@@ -986,7 +986,7 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
     setTimeout(() => {
       setDigitizedResult({
         title: 'INGESTED QUESTION PAPER - MATH 101',
-        subtitle: 'Processed via Acharya AI OCR engine',
+        subtitle: 'Processed via techUs OCR engine',
         sections: [
           {
             title: 'Section A: Calculus Foundations',
@@ -1173,7 +1173,7 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
 
               <div className="border-t border-white/[0.06] pt-4.5 mt-6 text-right">
                 <span className="text-[10px] text-gray-500 font-space tracking-widest uppercase font-black">
-                  Acharya AI Digitizer Module V1.0
+                  techUs Digitizer Module V1.0
                 </span>
               </div>
             </div>

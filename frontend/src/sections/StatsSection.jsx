@@ -49,7 +49,7 @@ export default function StatsSection() {
             Trusted by Educators Worldwide
           </h2>
           <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-            Acharya AI is helping thousands of educators transform their classrooms
+            techUs is helping thousands of educators transform their classrooms
           </p>
         </motion.div>
 
