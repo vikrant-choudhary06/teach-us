@@ -2007,7 +2007,8 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
     const newPages = files.map(file => ({
       name: file.name,
       size: (file.size / 1024).toFixed(1) + ' KB',
-      id: Date.now() + Math.random()
+      id: Date.now() + Math.random(),
+      file: file
     }))
     setUploadedPages(prev => [...prev, ...newPages])
   }
@@ -2017,21 +2018,125 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
     setDigitizedResult(null)
   }
 
-  const runDigitization = () => {
+  const runDigitization = async () => {
+    if (uploadedPages.length === 0) return
     setIsDigitizing(true)
-    setTimeout(() => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      const token = info.token
+
+      const formData = new FormData()
+      formData.append('file', uploadedPages[0].file)
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/grader/digitize`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.message || 'Digitization failed')
+      }
+
+      const data = await res.json()
+      setDigitizedResult(data)
+      showToast('Document digitized successfully!', 'success')
+      if (onAssetCreated) onAssetCreated()
+    } catch (error) {
+      console.error(error)
+      showToast(error.message || 'Failed to digitize document', 'error')
+    } finally {
       setIsDigitizing(false)
-      showToast('OCR Ingestion Service is currently unavailable. Mock responses have been disabled.', 'error')
-    }, 1000)
+    }
   }
 
-  const runCameraScan = () => {
+  const runCameraScan = async () => {
     if (isScanning) return
     setIsScanning(true)
-    setTimeout(() => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      const token = info.token
+
+      const canvas = document.createElement('canvas')
+      canvas.width = 10
+      canvas.height = 10
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = 'rgba(0,0,0,0)'
+      ctx.fillRect(0, 0, 10, 10)
+      
+      const fileBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg'))
+      const dummyFile = new File([fileBlob], 'scan.jpg', { type: 'image/jpeg' })
+
+      const formData = new FormData()
+      formData.append('file', dummyFile)
+      formData.append('studentId', selectedStudentId)
+      formData.append('title', 'AI Handwritten Homework Grading')
+      formData.append('rubric', 'Verify completeness, factual accuracy, clear explanations, and structure.')
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/grader/grade`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.message || 'AI Grading failed')
+      }
+
+      const data = await res.json()
+
+      const studentObj = students.find(s => s.id === selectedStudentId)
+      setDigitizedResult({
+        type: 'grade',
+        score: data.evaluation.score,
+        studentName: studentObj ? studentObj.name : 'Unknown Student',
+        feedback: data.evaluation.feedback,
+        title: 'AI Graded Homework',
+        subtitle: `Graded assignment: AI Handwritten Homework Grading`,
+        sections: [
+          {
+            title: 'Rubric Analysis',
+            questions: [data.evaluation.rubricAnalysis]
+          },
+          {
+            title: 'Extracted OCR Text',
+            questions: [data.evaluation.extractedText]
+          }
+        ]
+      })
+
+      setStudents(prev => prev.map(s => {
+        if (s.id === selectedStudentId) {
+          return {
+            ...s,
+            grade: `${data.evaluation.score}/100`,
+            assignmentStatus: 'Completed',
+            aiFeedback: data.evaluation.feedback
+          }
+        }
+        return s
+      }))
+
+      showToast('Homework graded successfully by AI!', 'success')
+      if (onAssetCreated) onAssetCreated()
+    } catch (error) {
+      console.error(error)
+      showToast(error.message || 'Failed to grade homework', 'error')
+    } finally {
       setIsScanning(false)
-      showToast('AI Homework Grader is currently offline. Mock responses have been disabled.', 'error')
-    }, 1000)
+    }
   }
 
   return (
@@ -2362,13 +2467,43 @@ export function MathHelper({ pushWorksheetToClass, onProblemSolved, showToast })
     ]
   }
 
-  const handleSolve = () => {
+  const handleSolve = async () => {
     if (!problem.trim()) return
     setIsSolving(true)
-    setTimeout(() => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      const token = info.token
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/grader/solve-math`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          problem,
+          topic: selectedTopic
+        })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.message || 'Math Solver failed')
+      }
+
+      const data = await res.json()
+      setSolutionSteps(data.solutionSteps || [])
+      showToast('Problem solved successfully!', 'success')
+      if (onProblemSolved) onProblemSolved()
+    } catch (error) {
+      console.error(error)
+      showToast(error.message || 'Failed to solve problem', 'error')
+    } finally {
       setIsSolving(false)
-      showToast('Math Helper Service is currently offline. Mock solutions are disabled.', 'error')
-    }, 1000)
+    }
   }
 
   return (
@@ -2657,13 +2792,46 @@ export function LessonPlanner({ setDeployedMaterial, setActiveTab, showToast, on
     }
   }
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!topic.trim()) return
     setIsGenerating(true)
-    setTimeout(() => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      const token = info.token
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/lessons/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          grade,
+          subject,
+          topic,
+          duration,
+          objectives: learningObjectives
+        })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.message || 'Lesson Plan generation failed')
+      }
+
+      const data = await res.json()
+      setLessonPlan(data)
+      showToast('Lesson plan generated successfully!', 'success')
+      if (onPlanGenerated) onPlanGenerated()
+    } catch (error) {
+      console.error(error)
+      showToast(error.message || 'Failed to generate lesson plan', 'error')
+    } finally {
       setIsGenerating(false)
-      showToast('AI Lesson Planner service is currently offline. Mock generation is disabled.', 'error')
-    }, 1000)
+    }
   }
 
   const handleDeploy = () => {
@@ -2860,13 +3028,43 @@ export function VisualAids({ setDeployedMaterial, setActiveTab, showToast, onAid
   const [isGenerating, setIsGenerating] = useState(false)
   const [visualAid, setVisualAid] = useState(null)
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!prompt.trim()) return
     setIsGenerating(true)
-    setTimeout(() => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      const token = info.token
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/grader/visual-aid`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          prompt,
+          type: aidType
+        })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.message || 'Visual Aid generation failed')
+      }
+
+      const data = await res.json()
+      setVisualAid(data)
+      showToast('Visual Aid generated successfully!', 'success')
+      if (onAidGenerated) onAidGenerated()
+    } catch (error) {
+      console.error(error)
+      showToast(error.message || 'Failed to generate visual aid', 'error')
+    } finally {
       setIsGenerating(false)
-      showToast('AI Visual Aids service is currently offline. Mock generation is disabled.', 'error')
-    }, 1000)
+    }
   }
 
   const handleDeploy = () => {

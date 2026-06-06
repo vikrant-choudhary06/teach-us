@@ -1068,7 +1068,7 @@ export default function StudentDashboard() {
                       <div className="space-y-1.5">
                         <h3 className="text-base font-black text-white font-space">Real-Time Queue Matchmaking</h3>
                         <p className="text-[11px] text-gray-400 leading-relaxed font-semibold max-w-sm">
-                          Search for online students studying Chapter 1. Sockets automatically pairs you, or matches you with Arya (AI Helper) if queue times exceed 6 seconds.
+                          Search for online students studying Chapter 1. Sockets automatically pairs you in real-time to start a collaborative study session.
                         </p>
                       </div>
                       <button

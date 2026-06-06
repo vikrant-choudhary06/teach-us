@@ -1,5 +1,5 @@
 import Lesson from '../models/Lesson.js';
-import { summarizeLessonWithAI } from '../services/aiService.js';
+import { summarizeLessonWithAI, generateLessonPlanWithAI } from '../services/aiService.js';
 
 
 
@@ -102,6 +102,21 @@ export const generateLessonSummary = async (req, res) => {
     });
   } catch (error) {
     console.error('Lesson summary compilation controller error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const generateLessonPlan = async (req, res) => {
+  const { grade, subject, topic, duration, objectives } = req.body;
+
+  if (!grade || !subject || !topic || !duration) {
+    return res.status(400).json({ message: 'Grade, subject, topic, and duration are required' });
+  }
+
+  try {
+    const lessonPlan = await generateLessonPlanWithAI(grade, subject, topic, duration, objectives);
+    res.json(lessonPlan);
+  } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
