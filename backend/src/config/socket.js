@@ -170,34 +170,6 @@ export const initSocket = (server) => {
         });
 
         console.log(`[Socket] Real match established between ${userName} and ${partner.userName} in room ${roomId}`);
-      } else {
-        // Setup AI Study Partner mock fallback after 6 seconds if no real user matches
-        setTimeout(() => {
-          const stillInQueueIdx = matchmakingQueue.findIndex(q => q.userId === userId && q.socket.id === socket.id);
-          if (stillInQueueIdx !== -1) {
-            matchmakingQueue.splice(stillInQueueIdx, 1);
-
-            const roomId = `coop_room_mock_${userId}`;
-            socket.join(roomId);
-            socket.coopRoomId = roomId;
-
-            coopRooms[roomId] = {
-              studentA: { userId, userName, socketId: socket.id },
-              studentB: { userId: 'mock-ai-partner', userName: 'Arya (AI Study Partner)', socketId: null },
-              isMock: true
-            };
-
-            socket.emit('coop:matched', {
-              roomId,
-              partnerName: 'Arya (AI Study Partner)',
-              partnerId: 'mock-ai-partner',
-              playerA: { userId, userName },
-              playerB: { userId: 'mock-ai-partner', userName: 'Arya (AI Study Partner)' }
-            });
-
-            console.log(`[Socket] Matchmaking timeout. Paired ${userName} with Arya (AI Study Partner) in room ${roomId}`);
-          }
-        }, 6000);
       }
     });
 
@@ -224,27 +196,6 @@ export const initSocket = (server) => {
     socket.on('coop:chat_message', (msg) => {
       if (socket.coopRoomId) {
         socket.to(socket.coopRoomId).emit('coop:chat_message', msg);
-
-        // If matched with Arya, simulate a responsive co-op student dialog after 1.5 seconds
-        const room = coopRooms[socket.coopRoomId];
-        if (room && room.isMock) {
-          setTimeout(() => {
-            const aiMessages = [
-              "Nice work! Your canvas sketches look clean. Let's finish the drawing.",
-              "I see you added a drawing! Let me add some details too.",
-              "That looks correct. Let's complete the assignment to claim our Credits!",
-              "Awesome! I am active. Let's hit the Complete Mission button when you are ready.",
-              "Let's sync up! I am working on the whiteboard now."
-            ];
-            const randomMsg = aiMessages[Math.floor(Math.random() * aiMessages.length)];
-            socket.emit('coop:chat_message', {
-              sender: 'Arya (AI)',
-              role: 'Student',
-              text: randomMsg,
-              timestamp: new Date().toLocaleTimeString()
-            });
-          }, 1500);
-        }
       }
     });
 
