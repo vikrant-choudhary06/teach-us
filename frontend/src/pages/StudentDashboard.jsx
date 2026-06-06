@@ -120,6 +120,7 @@ export default function StudentDashboard() {
 
   // Synced drawing board states
   const canvasRef = useRef(null)
+  const liveCanvasRef = useRef(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [brushColor, setBrushColor] = useState('#10b981')
   const [brushSize, setBrushSize] = useState(4)
@@ -128,6 +129,30 @@ export default function StudentDashboard() {
 
   const socketRef = useRef(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (activeMode === 'whiteboard' && liveCanvasRef.current) {
+      const canvas = liveCanvasRef.current
+      const container = canvas.parentElement
+      canvas.width = container.clientWidth
+      canvas.height = Math.max(container.clientHeight, 400)
+      
+      const ctx = canvas.getContext('2d')
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      
+      // Draw grid
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.03)'
+      ctx.lineWidth = 1
+      const step = 20
+      for (let x = 0; x < canvas.width; x += step) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += step) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+    }
+  }, [activeMode, activeTab])
 
   // Load User Data & Courses
   useEffect(() => {
@@ -139,6 +164,10 @@ export default function StudentDashboard() {
     if (savedInfo) {
       try {
         const info = JSON.parse(savedInfo)
+        if (info.role === 'Teacher') {
+          navigate('/professor-dashboard')
+          return
+        }
         setUserName(info.name || 'Student')
         setUserId(info._id || '')
         setUserUid(info.uid || '')
@@ -260,12 +289,58 @@ export default function StudentDashboard() {
 
     socketRef.current.on('student:join_success', ({ deckUid }) => {
       alert(`Successfully joined Professor's Deck: ${deckUid}`)
-      // Clear out material to show waiting state
       setLiveMaterial(null)
     })
 
     socketRef.current.on('student:join_error', ({ message }) => {
       alert(`Join failed: ${message}`)
+    })
+
+    socketRef.current.on('student:sync_mode', (mode) => {
+      setActiveMode(mode)
+    })
+
+    socketRef.current.on('student:draw_start', ({ x, y, width, height }) => {
+      const canvas = liveCanvasRef.current
+      if (!canvas) return
+      const scaleX = canvas.width / width
+      const scaleY = canvas.height / height
+      const ctx = canvas.getContext('2d')
+      ctx.beginPath()
+      ctx.moveTo(x * scaleX, y * scaleY)
+    })
+
+    socketRef.current.on('student:draw', ({ x, y, color, strokeWidth, width, height }) => {
+      const canvas = liveCanvasRef.current
+      if (!canvas) return
+      const scaleX = canvas.width / width
+      const scaleY = canvas.height / height
+      const ctx = canvas.getContext('2d')
+      ctx.strokeStyle = color
+      ctx.lineWidth = strokeWidth
+      ctx.lineTo(x * scaleX, y * scaleY)
+      ctx.stroke()
+    })
+
+    socketRef.current.on('student:draw_end', () => {
+      // nothing needed specifically
+    })
+
+    socketRef.current.on('student:clear_canvas', () => {
+      const canvas = liveCanvasRef.current
+      if (!canvas) return
+      const ctx = canvas.getContext('2d')
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      // redraw grid
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.03)'
+      ctx.lineWidth = 1
+      const step = 20
+      for (let x = 0; x < canvas.width; x += step) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += step) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
     })
 
     socketRef.current.on('student:receive_material', (material) => {
@@ -1421,21 +1496,21 @@ export default function StudentDashboard() {
                 exit={{ opacity: 0, y: -15 }}
                 className="space-y-6"
               >
-                <div className="relative rounded-3xl border border-white/[0.08] p-8 bg-gradient-to-r from-[#061209] to-[#040806] overflow-hidden shadow-2xl min-h-[500px]">
+                <div className="relative rounded-3xl border border-white/[0.08] p-8 bg-gradient-to-r from-[#061209] to-[#040806] overflow-hidden shadow-2xl h-[calc(100vh-140px)] flex flex-col">
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-64 bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none" />
                   
-                  <div className="flex items-center justify-between mb-8 relative z-10 border-b border-white/[0.05] pb-6">
+                  <div className="flex items-center justify-between mb-8 relative z-10 border-b border-white/[0.05] pb-6 shrink-0">
                     <div>
                       <h2 className="text-2xl font-black text-white font-space flex items-center gap-3">
                         <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
                         Live Flight Deck
                       </h2>
-                      <p className="text-sm font-semibold text-gray-400 mt-1">Real-time materials pushed by the Professor.</p>
+                      <p className="text-sm font-semibold text-gray-400 mt-1">Real-time materials and whiteboard pushed by the Professor.</p>
                     </div>
                   </div>
 
-                  <div className="relative z-10 w-full flex flex-col items-center justify-center">
-                    {!liveMaterial ? (
+                  <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center">
+                    {!liveMaterial && activeMode !== 'whiteboard' ? (
                       <div className="text-center space-y-6 my-16 max-w-md w-full">
                         <div className="w-16 h-16 rounded-full bg-[#121a15] border border-white/[0.05] mx-auto flex items-center justify-center">
                           <HiOutlineSparkles size={28} className="text-emerald-500/50" />
@@ -1468,6 +1543,19 @@ export default function StudentDashboard() {
                         </div>
                         <div className="pt-4 border-t border-white/[0.05]">
                            <p className="text-xs text-emerald-500/60 font-bold uppercase tracking-widest">Waiting for materials...</p>
+                        </div>
+                      </div>
+                    ) : activeMode === 'whiteboard' ? (
+                      <div className="w-full h-full bg-[#080b09]/80 border border-emerald-500/20 p-4 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.08)] backdrop-blur-md flex flex-col">
+                        <div className="mb-4 flex items-center justify-between border-b border-white/[0.05] pb-4">
+                          <h3 className="text-xl font-extrabold text-white font-space">Live Whiteboard Sync</h3>
+                          <p className="text-xs text-emerald-400 uppercase tracking-widest mt-1 font-bold">Watch Professor Live</p>
+                        </div>
+                        <div className="flex-1 w-full rounded-xl overflow-hidden relative border border-white/[0.06] bg-[#0a0f0c] min-h-[400px]">
+                          <canvas
+                            ref={liveCanvasRef}
+                            className="absolute inset-0 w-full h-full"
+                          />
                         </div>
                       </div>
                     ) : (

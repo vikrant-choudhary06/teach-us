@@ -48,8 +48,23 @@ import {
 export default function Dashboard() {
   const socketRef = useRef(null)
   const [deckUid, setDeckUid] = useState(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
+    const savedInfo = localStorage.getItem('userInfo')
+    if (savedInfo) {
+      try {
+        const info = JSON.parse(savedInfo)
+        if (info.role === 'Student') {
+          navigate('/student-dashboard')
+          return
+        }
+      } catch (e) {}
+    } else {
+      navigate('/login')
+      return
+    }
+
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
     socketRef.current = io(API_URL)
 
@@ -593,6 +608,7 @@ export default function Dashboard() {
       case 'flight-deck':
         return (
           <LiveFlightDeck
+            socketRef={socketRef}
             deckUid={deckUid}
             handleAddStudentByUid={handleAddStudentByUid}
             digitizedResult={digitizedResult}
@@ -1342,8 +1358,14 @@ function FeatureWorkspace({ tabId, menuItem }) {
 }
 
 
-function LiveFlightDeck({ deckUid, handleAddStudentByUid, digitizedResult, setActiveTab, students, setStudents, pushWorksheetToClass, deployedMaterial, setDeployedMaterial, handleAddStudent }) {
+function LiveFlightDeck({ socketRef, deckUid, handleAddStudentByUid, digitizedResult, setActiveTab, students, setStudents, pushWorksheetToClass, deployedMaterial, setDeployedMaterial, handleAddStudent }) {
   const [activeMode, setActiveMode] = useState('presentation') // 'presentation' | 'whiteboard'
+
+  useEffect(() => {
+    if (socketRef && socketRef.current) {
+      socketRef.current.emit('teacher:sync_mode', activeMode)
+    }
+  }, [activeMode, socketRef])
   const [brushColor, setBrushColor] = useState('#10b981')
   const [brushWidth, setBrushWidth] = useState(4)
   const [isDrawing, setIsDrawing] = useState(false)
@@ -1450,9 +1472,14 @@ function LiveFlightDeck({ deckUid, handleAddStudentByUid, digitizedResult, setAc
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     const rect = canvas.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
     ctx.beginPath()
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top)
+    ctx.moveTo(x, y)
     setIsDrawing(true)
+    if (socketRef && socketRef.current) {
+      socketRef.current.emit('teacher:draw_start', { x, y, width: canvas.width, height: canvas.height })
+    }
   }
 
   const draw = (e) => {
@@ -1461,14 +1488,22 @@ function LiveFlightDeck({ deckUid, handleAddStudentByUid, digitizedResult, setAc
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     const rect = canvas.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
     ctx.strokeStyle = brushColor
     ctx.lineWidth = brushWidth
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top)
+    ctx.lineTo(x, y)
     ctx.stroke()
+    if (socketRef && socketRef.current) {
+      socketRef.current.emit('teacher:draw', { x, y, color: brushColor, strokeWidth: brushWidth, width: canvas.width, height: canvas.height })
+    }
   }
 
   const stopDrawing = () => {
     setIsDrawing(false)
+    if (socketRef && socketRef.current) {
+      socketRef.current.emit('teacher:draw_end')
+    }
   }
 
   const clearCanvas = () => {
@@ -1492,6 +1527,10 @@ function LiveFlightDeck({ deckUid, handleAddStudentByUid, digitizedResult, setAc
       ctx.moveTo(0, y)
       ctx.lineTo(canvas.width, y)
       ctx.stroke()
+    }
+
+    if (socketRef && socketRef.current) {
+      socketRef.current.emit('teacher:clear_canvas')
     }
   }
 

@@ -248,13 +248,32 @@ export const initSocket = (server) => {
 
     socket.on('teacher:push_material', (material) => {
       if (socket.deckUid) {
-        // Send only to students in this specific deck
         socket.to(`deck_${socket.deckUid}`).emit('student:receive_material', material);
       } else {
-        // Fallback broadcast
         io.emit('student:receive_material', material);
       }
       console.log(`[Socket] Teacher pushed material: ${material?.title || 'Unknown'}`);
+    });
+
+    socket.on('teacher:draw_start', (data) => {
+      if (socket.deckUid) socket.to(`deck_${socket.deckUid}`).emit('student:draw_start', data);
+    });
+
+    socket.on('teacher:draw', (data) => {
+      if (socket.deckUid) socket.to(`deck_${socket.deckUid}`).emit('student:draw', data);
+    });
+
+    socket.on('teacher:draw_end', () => {
+      if (socket.deckUid) socket.to(`deck_${socket.deckUid}`).emit('student:draw_end');
+    });
+
+    socket.on('teacher:clear_canvas', () => {
+      if (socket.deckUid) socket.to(`deck_${socket.deckUid}`).emit('student:clear_canvas');
+    });
+
+    socket.on('teacher:sync_mode', (mode) => {
+      if (socket.deckUid) socket.to(`deck_${socket.deckUid}`).emit('student:sync_mode', mode);
+      console.log(`[Socket] Teacher synced mode: ${mode}`);
     });
 
     socket.on('teacher:add_student', (student) => {
