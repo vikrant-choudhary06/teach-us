@@ -206,22 +206,61 @@ const runDeckTests = async () => {
       const timeout = setTimeout(() => reject(new Error('Timeout waiting for drawing end')), 3000);
 
       studentSocket.on('student:draw_end', (data) => {
-        if (data.action && data.action.type === 'pencil') {
-          console.log('✅ Student verified student:draw_end transmission.');
-          resolve();
+        if (data.action && data.action.type === 'shape' && data.action.shape === 'arrow') {
+          if (data.action.fillColor === 'rgba(16,185,129,0.15)' && data.action.opacity === 80) {
+            console.log('✅ Student verified student:draw_end arrow shape with fill color and opacity transmission.');
+            resolve();
+          } else {
+            reject(new Error('Incorrect arrow properties received by student'));
+          }
         }
       });
 
       teacherSocket.emit('teacher:draw_end', {
         action: {
-          type: 'pencil',
-          points: [{ x: 10, y: 20 }, { x: 15, y: 25 }],
+          type: 'shape',
+          shape: 'arrow',
+          x1: 10,
+          y1: 20,
+          x2: 100,
+          y2: 200,
           color: '#10b981',
+          fillColor: 'rgba(16,185,129,0.15)',
           size: 4,
+          opacity: 80,
           canvasWidth: 800,
           canvasHeight: 600
         }
       });
+    });
+
+    // 8. Test Canvas History Synchronization (e.g. selection translation update)
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Timeout waiting for history sync')), 3000);
+
+      studentSocket.on('student:sync_history', (history) => {
+        if (Array.isArray(history) && history.length === 1 && history[0].type === 'shape' && history[0].shape === 'diamond') {
+          console.log('✅ Student verified student:sync_history (whiteboard elements drag-n-move update) transmission.');
+          resolve();
+        }
+      });
+
+      teacherSocket.emit('teacher:sync_history', [
+        {
+          type: 'shape',
+          shape: 'diamond',
+          x1: 50,
+          y1: 50,
+          x2: 150,
+          y2: 150,
+          color: '#3b82f6',
+          fillColor: 'transparent',
+          size: 4,
+          opacity: 100,
+          canvasWidth: 800,
+          canvasHeight: 600
+        }
+      ]);
     });
 
     console.log('\n====================================================');

@@ -1424,6 +1424,17 @@ function LiveFlightDeck({
   
   const canvasRef = useRef(null);
   const currentStrokeRef = useRef(null);
+  
+  // Selection and Drag-Move engine states
+  const [selectedElementIdx, setSelectedElementIdx] = useState(-1);
+  const draggedOriginalElementRef = useRef(null);
+  
+  // Excalidraw-like config states
+  const [fillColor, setFillColor] = useState('transparent');
+  const [opacity, setOpacity] = useState(100);
+  const [fontFamily, setFontFamily] = useState('sans-serif');
+  const [fontSize, setFontSize] = useState(4);
+  const [textAlign, setTextAlign] = useState('left');
 
   // Auto scroll chat
   const chatEndRef = useRef(null);
@@ -1480,6 +1491,12 @@ function LiveFlightDeck({
     const scaleX = targetWidth / (action.canvasWidth || 800);
     const scaleY = targetHeight / (action.canvasHeight || 600);
     
+    // Save previous alpha
+    const oldAlpha = ctx.globalAlpha;
+    if (action.opacity !== undefined) {
+      ctx.globalAlpha = action.opacity / 100;
+    }
+    
     if (action.type === 'pencil' || action.type === 'eraser') {
       if (action.points.length < 1) return;
       ctx.beginPath();
@@ -1493,7 +1510,8 @@ function LiveFlightDeck({
     } else if (action.type === 'shape') {
       ctx.strokeStyle = action.color;
       ctx.lineWidth = action.size * Math.min(scaleX, scaleY);
-      ctx.fillStyle = 'transparent';
+      ctx.fillStyle = action.fillColor || 'transparent';
+      
       const x1 = action.x1 * scaleX;
       const y1 = action.y1 * scaleY;
       const x2 = action.x2 * scaleX;
@@ -1505,19 +1523,132 @@ function LiveFlightDeck({
         ctx.lineTo(x2, y2);
         ctx.stroke();
       } else if (action.shape === 'rect') {
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        }
         ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
       } else if (action.shape === 'circle') {
         ctx.beginPath();
         const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
         ctx.arc(x1, y1, r, 0, 2 * Math.PI);
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          ctx.fill();
+        }
         ctx.stroke();
+      } else if (action.shape === 'diamond') {
+        ctx.beginPath();
+        ctx.moveTo(x1 + (x2 - x1) / 2, y1);
+        ctx.lineTo(x2, y1 + (y2 - y1) / 2);
+        ctx.lineTo(x1 + (x2 - x1) / 2, y2);
+        ctx.lineTo(x1, y1 + (y2 - y1) / 2);
+        ctx.closePath();
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          ctx.fill();
+        }
+        ctx.stroke();
+      } else if (action.shape === 'arrow') {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const arrowLength = 12 * Math.min(scaleX, scaleY);
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - arrowLength * Math.cos(angle - Math.PI / 6), y2 - arrowLength * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - arrowLength * Math.cos(angle + Math.PI / 6), y2 - arrowLength * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fillStyle = action.color;
+        ctx.fill();
       }
     } else if (action.type === 'text') {
       ctx.fillStyle = action.color;
       const scaledSize = action.size * Math.min(scaleX, scaleY);
-      ctx.font = `${scaledSize * 3 + 12}px sans-serif`;
+      const fontFamily = action.fontFamily === 'handdrawn' ? '"Comic Sans MS", cursive, sans-serif' : action.fontFamily === 'mono' ? 'monospace' : 'sans-serif';
+      ctx.font = `${scaledSize * 3 + 12}px ${fontFamily}`;
+      ctx.textAlign = action.textAlign || 'left';
       ctx.fillText(action.text, action.x * scaleX, action.y * scaleY);
+      ctx.textAlign = 'left'; // Reset
     }
+    
+    // Restore alpha
+    ctx.globalAlpha = oldAlpha;
+  };
+
+  const isHit = (action, x, y, threshold) => {
+    if (action.type === 'pencil' || action.type === 'eraser') {
+      return action.points.some(p => Math.sqrt(Math.pow(p.x - x, 2) + Math.pow(p.y - y, 2)) <= threshold + action.size);
+    } else if (action.type === 'shape') {
+      const { x1, y1, x2, y2, shape } = action;
+      if (shape === 'line' || shape === 'arrow') {
+        const A = x - x1;
+        const B = y - y1;
+        const C = x2 - x1;
+        const D = y2 - y1;
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        let param = -1;
+        if (lenSq !== 0) param = dot / lenSq;
+        let xx, yy;
+        if (param < 0) {
+          xx = x1;
+          yy = y1;
+        } else if (param > 1) {
+          xx = x2;
+          yy = y2;
+        } else {
+          xx = x1 + param * C;
+          yy = y1 + param * D;
+        }
+        const dist = Math.sqrt(Math.pow(x - xx, 2) + Math.pow(y - yy, 2));
+        return dist <= threshold + action.size;
+      } else if (shape === 'rect') {
+        const minX = Math.min(x1, x2);
+        const maxX = Math.max(x1, x2);
+        const minY = Math.min(y1, y2);
+        const maxY = Math.max(y1, y2);
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          return x >= minX && x <= maxX && y >= minY && y <= maxY;
+        }
+        const nearLeft = Math.abs(x - minX) <= threshold;
+        const nearRight = Math.abs(x - maxX) <= threshold;
+        const nearTop = Math.abs(y - minY) <= threshold;
+        const nearBottom = Math.abs(y - maxY) <= threshold;
+        return ((nearLeft || nearRight) && y >= minY && y <= maxY) ||
+               ((nearTop || nearBottom) && x >= minX && x <= maxX);
+      } else if (shape === 'circle') {
+        const cx = x1;
+        const cy = y1;
+        const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        const dist = Math.sqrt(Math.pow(x - cx, 2) + Math.pow(y - cy, 2));
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          return dist <= r + threshold;
+        }
+        return Math.abs(dist - r) <= threshold;
+      } else if (shape === 'diamond') {
+        const minX = Math.min(x1, x2);
+        const maxX = Math.max(x1, x2);
+        const minY = Math.min(y1, y2);
+        const maxY = Math.max(y1, y2);
+        const cx = minX + (maxX - minX) / 2;
+        const cy = minY + (maxY - minY) / 2;
+        const rx = (maxX - minX) / 2;
+        const ry = (maxY - minY) / 2;
+        if (rx === 0 || ry === 0) return false;
+        const term = Math.abs(x - cx) / rx + Math.abs(y - cy) / ry;
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          return term <= 1.1;
+        }
+        return Math.abs(term - 1.0) <= 0.2;
+      }
+    } else if (action.type === 'text') {
+      const { x: tx, y: ty, text, size } = action;
+      const fontHeight = size * 3 + 12;
+      const fontWidth = text.length * fontHeight * 0.6;
+      return x >= tx && x <= tx + fontWidth && y >= ty - fontHeight && y <= ty;
+    }
+    return false;
   };
 
   const getCanvasCoords = (e) => {
@@ -1546,12 +1677,34 @@ function LiveFlightDeck({
     setStartPos(coords);
     const canvas = canvasRef.current;
 
+    if (tool === 'select') {
+      const clickProximity = 8;
+      let foundIndex = -1;
+      const activeHistory = whiteboardHistory.slice(0, historyIndex);
+      // Search from top to bottom (reverse order)
+      for (let i = activeHistory.length - 1; i >= 0; i--) {
+        if (isHit(activeHistory[i], coords.x, coords.y, clickProximity)) {
+          foundIndex = i;
+          break;
+        }
+      }
+      if (foundIndex !== -1) {
+        setSelectedElementIdx(foundIndex);
+        draggedOriginalElementRef.current = JSON.parse(JSON.stringify(activeHistory[foundIndex]));
+      } else {
+        setSelectedElementIdx(-1);
+        draggedOriginalElementRef.current = null;
+      }
+      return;
+    }
+
     if (tool === 'pencil' || tool === 'eraser') {
       const newAction = {
         type: tool,
         points: [coords],
         color: brushColor,
         size: brushWidth,
+        opacity,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height
       };
@@ -1576,6 +1729,42 @@ function LiveFlightDeck({
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
+    if (tool === 'select') {
+      if (selectedElementIdx === -1 || !draggedOriginalElementRef.current) return;
+      const deltaX = coords.x - startPos.x;
+      const deltaY = coords.y - startPos.y;
+      const original = draggedOriginalElementRef.current;
+      
+      let updated;
+      if (original.type === 'pencil' || original.type === 'eraser') {
+        updated = {
+          ...original,
+          points: original.points.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }))
+        };
+      } else if (original.type === 'shape') {
+        updated = {
+          ...original,
+          x1: original.x1 + deltaX,
+          y1: original.y1 + deltaY,
+          x2: original.x2 + deltaX,
+          y2: original.y2 + deltaY
+        };
+      } else if (original.type === 'text') {
+        updated = {
+          ...original,
+          x: original.x + deltaX,
+          y: original.y + deltaY
+        };
+      }
+      
+      if (updated) {
+        const copy = [...whiteboardHistory];
+        copy[selectedElementIdx] = updated;
+        setWhiteboardHistory(copy);
+      }
+      return;
+    }
+
     if (tool === 'pencil' || tool === 'eraser') {
       currentStrokeRef.current.points.push(coords);
       if (socketRef.current) {
@@ -1599,21 +1788,59 @@ function LiveFlightDeck({
       redrawCanvas();
       ctx.strokeStyle = brushColor;
       ctx.lineWidth = brushWidth;
+      ctx.fillStyle = fillColor;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       
+      const x1 = startPos.x;
+      const y1 = startPos.y;
+      const x2 = coords.x;
+      const y2 = coords.y;
+      
       if (tool === 'line') {
         ctx.beginPath();
-        ctx.moveTo(startPos.x, startPos.y);
-        ctx.lineTo(coords.x, coords.y);
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
         ctx.stroke();
       } else if (tool === 'rect') {
-        ctx.strokeRect(startPos.x, startPos.y, coords.x - startPos.x, coords.y - startPos.y);
+        if (fillColor && fillColor !== 'transparent') {
+          ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        }
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
       } else if (tool === 'circle') {
         ctx.beginPath();
-        const r = Math.sqrt(Math.pow(coords.x - startPos.x, 2) + Math.pow(coords.y - startPos.y, 2));
-        ctx.arc(startPos.x, startPos.y, r, 0, 2 * Math.PI);
+        const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        ctx.arc(x1, y1, r, 0, 2 * Math.PI);
+        if (fillColor && fillColor !== 'transparent') {
+          ctx.fill();
+        }
         ctx.stroke();
+      } else if (tool === 'diamond') {
+        ctx.beginPath();
+        ctx.moveTo(x1 + (x2 - x1) / 2, y1);
+        ctx.lineTo(x2, y1 + (y2 - y1) / 2);
+        ctx.lineTo(x1 + (x2 - x1) / 2, y2);
+        ctx.lineTo(x1, y1 + (y2 - y1) / 2);
+        ctx.closePath();
+        if (fillColor && fillColor !== 'transparent') {
+          ctx.fill();
+        }
+        ctx.stroke();
+      } else if (tool === 'arrow') {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const arrowLength = 12;
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - arrowLength * Math.cos(angle - Math.PI / 6), y2 - arrowLength * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - arrowLength * Math.cos(angle + Math.PI / 6), y2 - arrowLength * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fillStyle = brushColor;
+        ctx.fill();
       }
     }
   };
@@ -1621,6 +1848,16 @@ function LiveFlightDeck({
   const handleMouseUp = (e) => {
     if (!isDrawing) return;
     setIsDrawing(false);
+    
+    if (tool === 'select') {
+      setSelectedElementIdx(-1);
+      draggedOriginalElementRef.current = null;
+      if (socketRef.current) {
+        socketRef.current.emit('teacher:sync_history', whiteboardHistory);
+      }
+      return;
+    }
+
     const coords = getCanvasCoords(e);
     const canvas = canvasRef.current;
     let finalAction = null;
@@ -1636,7 +1873,9 @@ function LiveFlightDeck({
         x2: coords.x,
         y2: coords.y,
         color: brushColor,
+        fillColor: fillColor,
         size: brushWidth,
+        opacity,
         canvasWidth: canvas.width,
         canvasHeight: canvas.height
       };
@@ -1668,6 +1907,9 @@ function LiveFlightDeck({
       y: textInputPos.y + 5,
       color: brushColor,
       size: brushWidth,
+      fontFamily: fontFamily,
+      textAlign: textAlign,
+      opacity: opacity,
       canvasWidth: canvas.width,
       canvasHeight: canvas.height
     };
@@ -1775,16 +2017,20 @@ function LiveFlightDeck({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1 min-h-0">
         
         {/* LEFT COLUMN: Synced Interactive Whiteboard (8 Columns) */}
-        <div className="lg:col-span-8 flex flex-col space-y-4 min-h-0">
-          <div className="border border-white/[0.08] bg-white/[0.02] backdrop-blur-md px-4 py-3 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-lg shrink-0">
-            <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/[0.06]">
+        <div className="lg:col-span-8 flex flex-col min-h-0 relative">
+          <div className="border border-white/[0.08] bg-[#050907]/95 rounded-2xl flex-1 relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] flex flex-col min-h-0">
+            {/* 1. Centered Floating Toolbar Overlay */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-black/85 border border-white/[0.08] p-1.5 rounded-xl shadow-2xl backdrop-blur-md">
               {[
-                { id: 'pencil', label: 'Pencil', icon: <HiOutlinePencil size={16} /> },
+                { id: 'select', label: 'Selection', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 7.827 5.34-2.508 1.157-1.378 1.16-.39 4.21Z" /></svg> },
+                { id: 'pencil', label: 'Pencil (Freehand)', icon: <HiOutlinePencil size={16} /> },
                 { id: 'line', label: 'Line', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="19" x2="19" y2="5" /></svg> },
+                { id: 'arrow', label: 'Arrow', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25 21 12m0 0-3.75 3.75M21 12H3" /></svg> },
                 { id: 'rect', label: 'Rectangle', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="1" /></svg> },
+                { id: 'diamond', label: 'Diamond', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3L21 12L12 21L3 12Z" /></svg> },
                 { id: 'circle', label: 'Circle', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" /></svg> },
-                { id: 'eraser', label: 'Eraser', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 20H7L3 16C2 15 2 13 3 12L13 2C14 1 16 1 17 2L21 6C22 7 22 9 21 10L14 17L18 20" /></svg> },
-                { id: 'text', label: 'Text', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 7V4H20V7M12 4V20M9 20H15" /></svg> }
+                { id: 'text', label: 'Text', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 7V4H20V7M12 4V20M9 20H15" /></svg> },
+                { id: 'eraser', label: 'Eraser', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 20H7L3 16C2 15 2 13 3 12L13 2C14 1 16 1 17 2L21 6C22 7 22 9 21 10L14 17L18 20" /></svg> }
               ].map(t => (
                 <button
                   key={t.id}
@@ -1792,7 +2038,7 @@ function LiveFlightDeck({
                   title={t.label}
                   className={`p-2.5 rounded-lg transition-all duration-200 cursor-pointer ${
                     tool === t.id
-                      ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.3)] font-extrabold'
+                      ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.3)] font-extrabold scale-105'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
@@ -1801,62 +2047,167 @@ function LiveFlightDeck({
               ))}
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1.5 bg-black/40 p-1.5 rounded-xl border border-white/[0.06]">
-                {['#10b981', '#3b82f6', '#ef4444', '#f59e0b', '#ffffff'].map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setBrushColor(c)}
-                    style={{ backgroundColor: c }}
-                    className={`w-5 h-5 rounded-full border transition-transform duration-150 cursor-pointer ${
-                      brushColor === c ? 'border-white scale-110 shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'border-transparent hover:scale-105'
-                    }`}
+            {/* 2. Left Configuration Sidebar Panel Overlay */}
+            {tool !== 'select' && tool !== 'eraser' && (
+              <div className="absolute top-20 left-4 z-20 flex flex-col gap-4 bg-black/85 border border-white/[0.08] p-4 rounded-xl shadow-2xl backdrop-blur-md w-56 text-xs max-h-[75%] overflow-y-auto custom-sidebar-scroll animate-fadeIn">
+                {/* Stroke Color selection */}
+                <div className="space-y-2">
+                  <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Stroke Color</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['#10b981', '#3b82f6', '#ef4444', '#f59e0b', '#ffffff', '#000000'].map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setBrushColor(c)}
+                        style={{ backgroundColor: c }}
+                        className={`w-5.5 h-5.5 rounded border transition-all duration-150 cursor-pointer ${
+                          brushColor === c ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fill Color selection */}
+                {tool !== 'pencil' && tool !== 'text' && (
+                  <div className="space-y-2">
+                    <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Background Fill</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['transparent', 'rgba(16,185,129,0.15)', 'rgba(59,130,246,0.15)', 'rgba(239,68,68,0.15)', 'rgba(245,158,11,0.15)', 'rgba(255,255,255,0.15)'].map(c => (
+                        <button
+                          key={c}
+                          onClick={() => setFillColor(c)}
+                          style={{ backgroundColor: c === 'transparent' ? 'transparent' : c }}
+                          className={`w-5.5 h-5.5 rounded border transition-all duration-150 cursor-pointer flex items-center justify-center ${
+                            fillColor === c ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'
+                          } ${c === 'transparent' ? 'border-white/[0.2] bg-[linear-gradient(45deg,transparent_45%,#fff_45%,#fff_55%,transparent_55%)]' : ''}`}
+                        >
+                          {c === 'transparent' && <span className="text-[10px] text-gray-500 font-bold">✖</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Stroke Width selection */}
+                <div className="space-y-2">
+                  <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Stroke Width</span>
+                  <div className="flex gap-2">
+                    {[
+                      { id: 2, label: 'Thin' },
+                      { id: 4, label: 'Medium' },
+                      { id: 8, label: 'Bold' }
+                    ].map(w => (
+                      <button
+                        key={w.id}
+                        onClick={() => setBrushWidth(w.id)}
+                        className={`flex-1 py-1.5 rounded text-[10px] border font-black transition-all cursor-pointer ${
+                          brushWidth === w.id
+                            ? 'bg-emerald-500 text-black border-emerald-500'
+                            : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {w.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Opacity selection */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase">
+                    <span>Opacity</span>
+                    <span className="text-emerald-400 font-mono font-black">{opacity}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    step="10"
+                    value={opacity}
+                    onChange={(e) => setOpacity(parseInt(e.target.value, 10))}
+                    className="w-full accent-emerald-500 cursor-pointer"
                   />
-                ))}
+                </div>
+
+                {/* Text Tool Configurations */}
+                {tool === 'text' && (
+                  <div className="space-y-3 pt-2 border-t border-white/[0.08] animate-fadeIn">
+                    <div className="space-y-1.5">
+                      <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Font Family</span>
+                      <div className="flex gap-1.5">
+                        {[
+                          { id: 'sans-serif', label: 'Sans' },
+                          { id: 'mono', label: 'Mono' },
+                          { id: 'handdrawn', label: 'Hand' }
+                        ].map(f => (
+                          <button
+                            key={f.id}
+                            onClick={() => setFontFamily(f.id)}
+                            className={`flex-1 py-1 rounded text-[9px] border font-bold transition-all cursor-pointer ${
+                              fontFamily === f.id
+                                ? 'bg-emerald-500 text-black border-emerald-500 font-black'
+                                : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Font Size</span>
+                      <div className="flex gap-1">
+                        {[
+                          { id: 2, label: 'S' },
+                          { id: 4, label: 'M' },
+                          { id: 6, label: 'L' },
+                          { id: 9, label: 'XL' }
+                        ].map(s => (
+                          <button
+                            key={s.id}
+                            onClick={() => setFontSize(s.id)}
+                            className={`w-7 h-7 rounded border font-black text-[10px] flex items-center justify-center transition-all cursor-pointer ${
+                              fontSize === s.id
+                                ? 'bg-emerald-500 text-black border-emerald-500'
+                                : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Alignment</span>
+                      <div className="flex gap-1.5">
+                        {[
+                          { id: 'left', label: 'Left', icon: '⫷' },
+                          { id: 'center', label: 'Center', icon: '⫸' },
+                          { id: 'right', label: 'Right', icon: '⫵' }
+                        ].map(a => (
+                          <button
+                            key={a.id}
+                            onClick={() => setTextAlign(a.id)}
+                            className={`flex-1 py-1 rounded text-[9px] border font-bold transition-all cursor-pointer ${
+                              textAlign === a.id
+                                ? 'bg-emerald-500 text-black border-emerald-500 font-black'
+                                : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white'
+                            }`}
+                            title={a.label}
+                          >
+                            {a.icon}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+            )}
 
-              <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-xl border border-white/[0.06] text-xs">
-                <span className="text-gray-400 font-semibold font-space">Width</span>
-                <input
-                  type="range"
-                  min="2"
-                  max="12"
-                  value={brushWidth}
-                  onChange={(e) => setBrushWidth(parseInt(e.target.value, 10))}
-                  className="w-16 accent-emerald-500 cursor-pointer"
-                />
-                <span className="text-emerald-400 font-bold font-mono">{brushWidth}px</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleUndo}
-                disabled={historyIndex <= 0}
-                className="p-2.5 bg-black/40 border border-white/[0.06] rounded-xl text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5 transition-colors cursor-pointer"
-                title="Undo"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
-              </button>
-              <button
-                onClick={handleRedo}
-                disabled={historyIndex >= whiteboardHistory.length}
-                className="p-2.5 bg-black/40 border border-white/[0.06] rounded-xl text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5 transition-colors cursor-pointer"
-                title="Redo"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" /></svg>
-              </button>
-              <button
-                onClick={handleClearBoard}
-                className="p-2.5 bg-red-950/15 border border-red-500/20 hover:border-red-500/40 hover:bg-red-950/35 text-red-400 rounded-xl transition-all duration-200 cursor-pointer"
-                title="Clear whiteboard"
-              >
-                <HiOutlineTrash size={16} />
-              </button>
-            </div>
-          </div>
-
-          <div className="border border-white/[0.08] bg-[#050907]/90 rounded-2xl flex-1 relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] flex flex-col justify-between min-h-0">
+            {/* 3. Main Drawing Interactive Canvas */}
             <div className="flex-1 w-full h-full relative cursor-crosshair overflow-hidden select-none">
               <canvas
                 ref={canvasRef}
@@ -1872,7 +2223,7 @@ function LiveFlightDeck({
               
               <div className="absolute bottom-4 left-4 pointer-events-none bg-black/50 border border-white/[0.06] backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] text-gray-400 font-semibold flex items-center gap-1.5 shadow-md">
                 <HiOutlinePencil className="text-emerald-400" size={12} />
-                <span>{tool === 'text' ? 'Click canvas to type text' : `Drawing with ${tool}`}</span>
+                <span>{tool === 'text' ? 'Click canvas to type text' : tool === 'select' ? 'Click and drag items to move' : `Drawing with ${tool}`}</span>
               </div>
 
               {textInputPos && (
@@ -1901,6 +2252,34 @@ function LiveFlightDeck({
                   </button>
                 </div>
               )}
+
+              {/* 4. Bottom Right floating zoom controls and clear button */}
+              <div className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 bg-black/85 border border-white/[0.08] p-1.5 rounded-xl shadow-2xl backdrop-blur-md">
+                <button
+                  onClick={handleUndo}
+                  disabled={historyIndex <= 0}
+                  className="p-2 bg-black/40 border border-white/[0.06] rounded-lg text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Undo"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
+                </button>
+                <button
+                  onClick={handleRedo}
+                  disabled={historyIndex >= whiteboardHistory.length}
+                  className="p-2 bg-black/40 border border-white/[0.06] rounded-lg text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Redo"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" /></svg>
+                </button>
+                <div className="w-px h-5 bg-white/[0.08] mx-0.5" />
+                <button
+                  onClick={handleClearBoard}
+                  className="p-2 bg-red-950/15 border border-red-500/20 hover:border-red-500/40 hover:bg-red-950/35 text-red-400 rounded-lg transition-all duration-200 cursor-pointer"
+                  title="Clear whiteboard"
+                >
+                  <HiOutlineTrash size={14} />
+                </button>
+              </div>
             </div>
           </div>
         </div>

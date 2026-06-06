@@ -149,6 +149,11 @@ export default function StudentDashboard() {
     const scaleX = targetWidth / (action.canvasWidth || 800);
     const scaleY = targetHeight / (action.canvasHeight || 600);
     
+    const oldAlpha = ctx.globalAlpha;
+    if (action.opacity !== undefined) {
+      ctx.globalAlpha = action.opacity / 100;
+    }
+    
     if (action.type === 'pencil' || action.type === 'eraser') {
       if (action.points.length < 1) return;
       ctx.beginPath();
@@ -162,7 +167,8 @@ export default function StudentDashboard() {
     } else if (action.type === 'shape') {
       ctx.strokeStyle = action.color;
       ctx.lineWidth = action.size * Math.min(scaleX, scaleY);
-      ctx.fillStyle = 'transparent';
+      ctx.fillStyle = action.fillColor || 'transparent';
+      
       const x1 = action.x1 * scaleX;
       const y1 = action.y1 * scaleY;
       const x2 = action.x2 * scaleX;
@@ -174,19 +180,56 @@ export default function StudentDashboard() {
         ctx.lineTo(x2, y2);
         ctx.stroke();
       } else if (action.shape === 'rect') {
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        }
         ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
       } else if (action.shape === 'circle') {
         ctx.beginPath();
         const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
         ctx.arc(x1, y1, r, 0, 2 * Math.PI);
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          ctx.fill();
+        }
         ctx.stroke();
+      } else if (action.shape === 'diamond') {
+        ctx.beginPath();
+        ctx.moveTo(x1 + (x2 - x1) / 2, y1);
+        ctx.lineTo(x2, y1 + (y2 - y1) / 2);
+        ctx.lineTo(x1 + (x2 - x1) / 2, y2);
+        ctx.lineTo(x1, y1 + (y2 - y1) / 2);
+        ctx.closePath();
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          ctx.fill();
+        }
+        ctx.stroke();
+      } else if (action.shape === 'arrow') {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const arrowLength = 12 * Math.min(scaleX, scaleY);
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - arrowLength * Math.cos(angle - Math.PI / 6), y2 - arrowLength * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - arrowLength * Math.cos(angle + Math.PI / 6), y2 - arrowLength * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fillStyle = action.color;
+        ctx.fill();
       }
     } else if (action.type === 'text') {
       ctx.fillStyle = action.color;
       const scaledSize = action.size * Math.min(scaleX, scaleY);
-      ctx.font = `${scaledSize * 3 + 12}px sans-serif`;
+      const fontFamily = action.fontFamily === 'handdrawn' ? '"Comic Sans MS", cursive, sans-serif' : action.fontFamily === 'mono' ? 'monospace' : 'sans-serif';
+      ctx.font = `${scaledSize * 3 + 12}px ${fontFamily}`;
+      ctx.textAlign = action.textAlign || 'left';
       ctx.fillText(action.text, action.x * scaleX, action.y * scaleY);
+      ctx.textAlign = 'left';
     }
+    
+    ctx.globalAlpha = oldAlpha;
   };
 
   const redrawLiveCanvas = () => {
