@@ -230,14 +230,15 @@ export const initSocket = (server) => {
     socket.on('teacher:start_deck', ({ deckUid }) => {
       activeDecks[deckUid] = {
         teacherSocketId: socket.id,
-        activeMode: 'presentation',
-        pdfUrl: null,
-        pdfName: '',
-        currentPage: 1,
-        liveMaterial: null
+        deckUid,
+        whiteboardHistory: [],
+        doubts: [],
+        chatMessages: [],
+        students: []
       };
       socket.join(`deck_${deckUid}`);
       socket.deckUid = deckUid;
+      socket.isTeacher = true;
       console.log(`[Socket] Teacher started flight deck with PIN: ${deckUid}`);
     });
 
@@ -246,80 +247,102 @@ export const initSocket = (server) => {
       if (deck) {
         socket.join(`deck_${deckUid}`);
         socket.deckUid = deckUid;
-        // Notify the teacher who started this deck
-        io.to(deck.teacherSocketId).emit('teacher:student_joined', studentDetails);
+        socket.isTeacher = false;
+        socket.userName = studentDetails.name;
+        socket.userEmail = studentDetails.email;
+        socket.userUid = studentDetails.uid;
+
+        // Add student to the list if not already present
+        if (!deck.students.some(s => s.email === studentDetails.email)) {
+          deck.students.push({
+            socketId: socket.id,
+            name: studentDetails.name,
+            email: studentDetails.email,
+            uid: studentDetails.uid
+          });
+        } else {
+          // Update socketId if they reconnected
+          deck.students = deck.students.map(s => 
+            s.email === studentDetails.email ? { ...s, socketId: socket.id } : s
+          );
+        }
+
+        // Notify the teacher with the updated student list
+        io.to(deck.teacherSocketId).emit('teacher:update_students', deck.students);
         socket.emit('student:join_success', { deckUid });
         
         // Immediately sync current state to this student
         socket.emit('student:sync_state', {
-          activeMode: deck.activeMode,
-          pdfUrl: deck.pdfUrl,
-          pdfName: deck.pdfName,
-          currentPage: deck.currentPage,
-          liveMaterial: deck.liveMaterial
+          whiteboardHistory: deck.whiteboardHistory,
+          chatMessages: deck.chatMessages,
+          doubts: deck.doubts,
+          students: deck.students
         });
-        console.log(`[Socket] Student joined flight deck ${deckUid} and synced state`);
+        console.log(`[Socket] Student ${studentDetails.name} joined flight deck ${deckUid} and synced state`);
       } else {
         socket.emit('student:join_error', { message: 'Invalid Deck PIN or Deck is not active' });
       }
     });
 
-    socket.on('teacher:push_material', (material) => {
-      if (socket.deckUid && activeDecks[socket.deckUid]) {
-        activeDecks[socket.deckUid].liveMaterial = material;
-        socket.to(`deck_${socket.deckUid}`).emit('student:receive_material', material);
-      } else {
-        io.emit('student:receive_material', material);
-      }
-      console.log(`[Socket] Teacher pushed material: ${material?.title || 'Unknown'}`);
-    });
-
     socket.on('teacher:draw_start', (data) => {
-      if (socket.deckUid) socket.to(`deck_${socket.deckUid}`).emit('student:draw_start', data);
+      if (socket.deckUid) {
+        socket.to(`deck_${socket.deckUid}`).emit('student:draw_start', data);
+      }
     });
 
-    socket.on('teacher:draw', (data) => {
-      if (socket.deckUid) socket.to(`deck_${socket.deckUid}`).emit('student:draw', data);
+    socket.on('teacher:draw_move', (data) => {
+      if (socket.deckUid) {
+        socket.to(`deck_${socket.deckUid}`).emit('student:draw_move', data);
+      }
     });
 
-    socket.on('teacher:draw_end', () => {
-      if (socket.deckUid) socket.to(`deck_${socket.deckUid}`).emit('student:draw_end');
+    socket.on('teacher:draw_end', (data) => {
+      if (socket.deckUid && activeDecks[socket.deckUid]) {
+        if (data && data.action) {
+          activeDecks[socket.deckUid].whiteboardHistory.push(data.action);
+        }
+        socket.to(`deck_${socket.deckUid}`).emit('student:draw_end', data);
+      }
     });
 
     socket.on('teacher:clear_canvas', () => {
-      if (socket.deckUid) socket.to(`deck_${socket.deckUid}`).emit('student:clear_canvas');
-    });
-
-    socket.on('teacher:sync_mode', (mode) => {
       if (socket.deckUid && activeDecks[socket.deckUid]) {
-        activeDecks[socket.deckUid].activeMode = mode;
-        socket.to(`deck_${socket.deckUid}`).emit('student:sync_mode', mode);
+        activeDecks[socket.deckUid].whiteboardHistory = [];
+        socket.to(`deck_${socket.deckUid}`).emit('student:clear_canvas');
       }
-      console.log(`[Socket] Teacher synced mode: ${mode}`);
     });
 
-    socket.on('teacher:sync_pdf', ({ pdfUrl, pdfName, currentPage }) => {
+    socket.on('teacher:sync_history', (history) => {
       if (socket.deckUid && activeDecks[socket.deckUid]) {
-        activeDecks[socket.deckUid].pdfUrl = pdfUrl;
-        activeDecks[socket.deckUid].pdfName = pdfName;
-        activeDecks[socket.deckUid].currentPage = currentPage || 1;
-        socket.to(`deck_${socket.deckUid}`).emit('student:sync_pdf', { pdfUrl, pdfName, currentPage: currentPage || 1 });
+        activeDecks[socket.deckUid].whiteboardHistory = history;
+        socket.to(`deck_${socket.deckUid}`).emit('student:sync_history', history);
       }
-      console.log(`[Socket] Teacher synced PDF: ${pdfName} at page ${currentPage}`);
     });
 
-    socket.on('teacher:change_page', ({ currentPage }) => {
-      if (socket.deckUid && activeDecks[socket.deckUid]) {
-        activeDecks[socket.deckUid].currentPage = currentPage;
-        socket.to(`deck_${socket.deckUid}`).emit('student:change_page', { currentPage });
+    // Chat events
+    socket.on('deck:chat_message', ({ deckUid, message }) => {
+      const deck = activeDecks[deckUid];
+      if (deck) {
+        deck.chatMessages.push(message);
+        io.to(`deck_${deckUid}`).emit('deck:chat_message', message);
       }
-      console.log(`[Socket] Teacher changed page to: ${currentPage}`);
     });
 
-    socket.on('teacher:add_student', (student) => {
-      // Notify that a student was added to the flight deck
-      io.emit('student:added_to_flight_deck', student);
-      console.log(`[Socket] Teacher added student to flight deck: ${student?.name || 'Unknown'}`);
+    // Doubt events
+    socket.on('deck:submit_doubt', ({ deckUid, doubt }) => {
+      const deck = activeDecks[deckUid];
+      if (deck) {
+        deck.doubts.push(doubt);
+        io.to(`deck_${deckUid}`).emit('deck:doubt_received', doubt);
+      }
+    });
+
+    socket.on('deck:resolve_doubt', ({ deckUid, doubtId }) => {
+      const deck = activeDecks[deckUid];
+      if (deck) {
+        deck.doubts = deck.doubts.filter(d => d.id !== doubtId);
+        io.to(`deck_${deckUid}`).emit('deck:doubt_resolved', doubtId);
+      }
     });
 
 
@@ -432,8 +455,16 @@ export const initSocket = (server) => {
 
       // Handle active flight deck cleanup
       if (socket.deckUid && activeDecks[socket.deckUid]) {
-        delete activeDecks[socket.deckUid];
-        console.log(`[Socket] Cleaned up active flight deck ${socket.deckUid} due to teacher disconnect`);
+        if (activeDecks[socket.deckUid].teacherSocketId === socket.id) {
+          io.to(`deck_${socket.deckUid}`).emit('student:deck_closed');
+          delete activeDecks[socket.deckUid];
+          console.log(`[Socket] Cleaned up active flight deck ${socket.deckUid} due to teacher disconnect`);
+        } else {
+          const deck = activeDecks[socket.deckUid];
+          deck.students = deck.students.filter(s => s.socketId !== socket.id);
+          io.to(deck.teacherSocketId).emit('teacher:update_students', deck.students);
+          console.log(`[Socket] Student ${socket.userName || 'Unknown'} disconnected from deck ${socket.deckUid}`);
+        }
       }
 
       const { classroomId, userId } = socket;

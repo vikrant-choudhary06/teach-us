@@ -123,15 +123,107 @@ export default function StudentDashboard() {
   const [pdfName, setPdfName] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
 
+  // Redesigned Flight Deck Sync states
+  const [deckPin, setDeckPin] = useState('')
+  const [deckWhiteboardHistory, setDeckWhiteboardHistory] = useState([])
+  const [deckChatMessages, setDeckChatMessages] = useState([])
+  const [deckChatInput, setDeckChatInput] = useState('')
+  const [deckDoubtInput, setDeckDoubtInput] = useState('')
 
   // Synced drawing board states
   const canvasRef = useRef(null)
   const liveCanvasRef = useRef(null)
+  const tempStrokeRef = useRef(null)
+  const deckChatEndRef = useRef(null)
+
   const [isDrawing, setIsDrawing] = useState(false)
   const [brushColor, setBrushColor] = useState('#10b981')
   const [brushSize, setBrushSize] = useState(4)
   const [lastX, setLastX] = useState(0)
   const [lastY, setLastY] = useState(0)
+
+  const drawLiveActionScaled = (ctx, action, targetWidth, targetHeight) => {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    const scaleX = targetWidth / (action.canvasWidth || 800);
+    const scaleY = targetHeight / (action.canvasHeight || 600);
+    
+    if (action.type === 'pencil' || action.type === 'eraser') {
+      if (action.points.length < 1) return;
+      ctx.beginPath();
+      ctx.strokeStyle = action.type === 'eraser' ? '#050907' : action.color;
+      ctx.lineWidth = action.size * Math.min(scaleX, scaleY);
+      ctx.moveTo(action.points[0].x * scaleX, action.points[0].y * scaleY);
+      for (let i = 1; i < action.points.length; i++) {
+        ctx.lineTo(action.points[i].x * scaleX, action.points[i].y * scaleY);
+      }
+      ctx.stroke();
+    } else if (action.type === 'shape') {
+      ctx.strokeStyle = action.color;
+      ctx.lineWidth = action.size * Math.min(scaleX, scaleY);
+      ctx.fillStyle = 'transparent';
+      const x1 = action.x1 * scaleX;
+      const y1 = action.y1 * scaleY;
+      const x2 = action.x2 * scaleX;
+      const y2 = action.y2 * scaleY;
+      
+      if (action.shape === 'line') {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      } else if (action.shape === 'rect') {
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      } else if (action.shape === 'circle') {
+        ctx.beginPath();
+        const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        ctx.arc(x1, y1, r, 0, 2 * Math.PI);
+        ctx.stroke();
+      }
+    } else if (action.type === 'text') {
+      ctx.fillStyle = action.color;
+      const scaledSize = action.size * Math.min(scaleX, scaleY);
+      ctx.font = `${scaledSize * 3 + 12}px sans-serif`;
+      ctx.fillText(action.text, action.x * scaleX, action.y * scaleY);
+    }
+  };
+
+  const redrawLiveCanvas = () => {
+    const canvas = liveCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw grid background
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.04)';
+    ctx.lineWidth = 1;
+    const gridStep = 25;
+    for (let x = 0; x < canvas.width; x += gridStep) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += gridStep) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+
+    // Draw history
+    deckWhiteboardHistory.forEach(action => {
+      drawLiveActionScaled(ctx, action, canvas.width, canvas.height);
+    });
+  };
+
+  useEffect(() => {
+    if (isJoined && liveCanvasRef.current) {
+      redrawLiveCanvas();
+    }
+  }, [deckWhiteboardHistory, isJoined]);
+
+  useEffect(() => {
+    if (deckChatEndRef.current) {
+      deckChatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [deckChatMessages]);
+
 
   const socketRef = useRef(null)
   const navigate = useNavigate()
@@ -296,90 +388,71 @@ export default function StudentDashboard() {
     socketRef.current.on('student:join_success', ({ deckUid }) => {
       alert(`Successfully joined Professor's Deck: ${deckUid}`)
       setIsJoined(true)
-      setLiveMaterial(null)
+      setDeckPin(deckUid)
+      setDeckWhiteboardHistory([])
+      setDeckChatMessages([])
     })
 
     socketRef.current.on('student:join_error', ({ message }) => {
       alert(`Join failed: ${message}`)
     })
 
-    socketRef.current.on('student:sync_state', ({ activeMode, pdfUrl, pdfName, currentPage, liveMaterial }) => {
-      setActiveMode(activeMode)
-      setPdfUrl(pdfUrl)
-      setPdfName(pdfName)
-      setCurrentPage(currentPage || 1)
-      setLiveMaterial(liveMaterial)
+    socketRef.current.on('student:sync_state', ({ whiteboardHistory, chatMessages, doubts }) => {
+      setDeckWhiteboardHistory(whiteboardHistory || [])
+      setDeckChatMessages(chatMessages || [])
     })
 
-    socketRef.current.on('student:sync_pdf', ({ pdfUrl, pdfName, currentPage }) => {
-      setPdfUrl(pdfUrl)
-      setPdfName(pdfName)
-      setCurrentPage(currentPage || 1)
-    })
+    socketRef.current.on('student:draw_start', ({ x, y, color, size, tool, width, height }) => {
+      tempStrokeRef.current = {
+        type: tool,
+        points: [{ x, y }],
+        color,
+        size,
+        canvasWidth: width,
+        canvasHeight: height
+      };
+      redrawLiveCanvas();
+    });
 
-    socketRef.current.on('student:change_page', ({ currentPage }) => {
-      setCurrentPage(currentPage)
-    })
+    socketRef.current.on('student:draw_move', ({ x, y, tool }) => {
+      if (!tempStrokeRef.current) return;
+      tempStrokeRef.current.points.push({ x, y });
+      
+      const canvas = liveCanvasRef.current;
+      if (!canvas) return;
+      redrawLiveCanvas();
+      const ctx = canvas.getContext('2d');
+      drawLiveActionScaled(ctx, tempStrokeRef.current, canvas.width, canvas.height);
+    });
 
-    socketRef.current.on('student:sync_mode', (mode) => {
-      setActiveMode(mode)
-    })
-
-    socketRef.current.on('student:draw_start', ({ x, y, width, height }) => {
-      const canvas = liveCanvasRef.current
-      if (!canvas) return
-      const scaleX = canvas.width / width
-      const scaleY = canvas.height / height
-      const ctx = canvas.getContext('2d')
-      ctx.beginPath()
-      ctx.moveTo(x * scaleX, y * scaleY)
-    })
-
-    socketRef.current.on('student:draw', ({ x, y, color, strokeWidth, width, height }) => {
-      const canvas = liveCanvasRef.current
-      if (!canvas) return
-      const scaleX = canvas.width / width
-      const scaleY = canvas.height / height
-      const ctx = canvas.getContext('2d')
-      ctx.strokeStyle = color
-      ctx.lineWidth = strokeWidth
-      ctx.lineTo(x * scaleX, y * scaleY)
-      ctx.stroke()
-    })
-
-    socketRef.current.on('student:draw_end', () => {
-      // nothing needed specifically
-    })
+    socketRef.current.on('student:draw_end', (data) => {
+      tempStrokeRef.current = null;
+      if (data && data.action) {
+        setDeckWhiteboardHistory(prev => [...prev, data.action]);
+      }
+    });
 
     socketRef.current.on('student:clear_canvas', () => {
-      const canvas = liveCanvasRef.current
-      if (!canvas) return
-      const ctx = canvas.getContext('2d')
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      // redraw grid
-      ctx.strokeStyle = 'rgba(16, 185, 129, 0.03)'
-      ctx.lineWidth = 1
-      const step = 20
-      for (let x = 0; x < canvas.width; x += step) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-      }
-      for (let y = 0; y < canvas.height; y += step) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-      }
-    })
+      tempStrokeRef.current = null;
+      setDeckWhiteboardHistory([]);
+    });
 
-    socketRef.current.on('student:receive_material', (material) => {
-      setLiveMaterial(material)
-      setActiveTab('live-class')
-      alert('Professor has pushed new material to the Live Class!')
-    })
+    socketRef.current.on('student:sync_history', (history) => {
+      tempStrokeRef.current = null;
+      setDeckWhiteboardHistory(history || []);
+    });
 
-    socketRef.current.on('student:added_to_flight_deck', (student) => {
-      // Show notification if it's us
-      if (student.email === userEmail) {
-        alert("You have been added to the Professor's Live Flight Deck!")
-      }
-    })
+    socketRef.current.on('deck:chat_message', (msg) => {
+      setDeckChatMessages(prev => [...prev, msg]);
+    });
+
+    socketRef.current.on('student:deck_closed', () => {
+      alert('The Professor has ended the live class session.');
+      setIsJoined(false);
+      setDeckPin('');
+      setDeckWhiteboardHistory([]);
+      setDeckChatMessages([]);
+    });
 
     return () => {
       if (socketRef.current) {
@@ -1519,171 +1592,174 @@ export default function StudentDashboard() {
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
-                className="space-y-6"
+                className="w-full h-[calc(100vh-120px)] flex flex-col space-y-6"
               >
-                <div className="relative rounded-3xl border border-white/[0.08] p-8 bg-gradient-to-r from-[#061209] to-[#040806] overflow-hidden shadow-2xl h-[calc(100vh-140px)] flex flex-col">
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-64 bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none" />
-                  
-                  <div className="flex items-center justify-between mb-8 relative z-10 border-b border-white/[0.05] pb-6 shrink-0">
+                {!isJoined ? (
+                  <div className="flex flex-col items-center justify-center p-12 border border-white/[0.08] bg-[#070b09]/40 backdrop-blur-xl rounded-3xl text-center space-y-6 max-w-md mx-auto my-16 relative overflow-hidden shadow-2xl">
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-64 bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none" />
+                    <div className="w-16 h-16 rounded-full bg-[#121a15] border border-white/[0.05] mx-auto flex items-center justify-center text-emerald-400/70 shadow-inner">
+                      <HiOutlineSparkles size={28} />
+                    </div>
                     <div>
-                      <h2 className="text-2xl font-black text-white font-space flex items-center gap-3">
-                        <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
-                        Live Flight Deck
-                      </h2>
-                      <p className="text-sm font-semibold text-gray-400 mt-1">Real-time materials and whiteboard pushed by the Professor.</p>
+                      <h3 className="text-xl font-bold text-white font-space">Join Live Flight Deck</h3>
+                      <p className="text-xs text-gray-500 mt-1">Enter the 6-digit Deck PIN provided by your Professor.</p>
+                    </div>
+                    <div className="flex gap-2 w-full">
+                       <input 
+                          id="deck-pin-input"
+                          type="text" 
+                          placeholder="e.g. 123456" 
+                          maxLength={6}
+                          className="w-full bg-[#0a0f0c] border border-emerald-500/20 focus:border-emerald-500/60 rounded-xl px-4 py-3 text-white text-center font-mono font-bold tracking-[0.25em] outline-none placeholder:tracking-normal placeholder:text-gray-600 placeholder:font-sans text-lg"
+                       />
+                       <button
+                         onClick={() => {
+                           const pin = document.getElementById('deck-pin-input').value;
+                           if (pin && pin.length === 6 && socketRef.current) {
+                              socketRef.current.emit('student:join_deck', {
+                                deckUid: pin,
+                                studentDetails: { name: userName, email: userEmail, uid: userUid }
+                              });
+                           } else {
+                              alert("Please enter a valid 6-digit Deck PIN.");
+                           }
+                         }}
+                         className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-space rounded-xl transition-colors shrink-0 cursor-pointer shadow-md"
+                       >
+                         Join
+                       </button>
                     </div>
                   </div>
-
-                  <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center">
-                    {!isJoined ? (
-                      <div className="text-center space-y-6 my-16 max-w-md w-full">
-                        <div className="w-16 h-16 rounded-full bg-[#121a15] border border-white/[0.05] mx-auto flex items-center justify-center">
-                          <HiOutlineSparkles size={28} className="text-emerald-500/50" />
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1 min-h-0">
+                    
+                    {/* LEFT COLUMN: Sync Board (8 columns) */}
+                    <div className="lg:col-span-8 flex flex-col space-y-4 min-h-0">
+                      <div className="border border-white/[0.08] bg-white/[0.02] px-4 py-3 rounded-2xl flex items-center justify-between shadow-lg shrink-0">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                          <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider font-space">Live Whiteboard Sync</h4>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-200">Join Live Flight Deck</h3>
-                          <p className="text-sm text-gray-500 mt-1">Enter the 6-digit Deck PIN provided by your Professor.</p>
-                        </div>
-                        <div className="flex gap-2">
-                           <input 
-                              id="deck-pin-input"
-                              type="text" 
-                              placeholder="e.g. 123456" 
-                              maxLength={6}
-                              className="w-full bg-[#0a0f0c] border border-emerald-500/20 focus:border-emerald-500/60 rounded-xl px-4 py-3 text-white text-center font-mono font-bold tracking-[0.25em] outline-none placeholder:tracking-normal placeholder:text-gray-600 placeholder:font-sans"
-                           />
-                           <button
-                             onClick={() => {
-                               const pin = document.getElementById('deck-pin-input').value;
-                               if(pin && pin.length === 6 && socketRef.current) {
-                                  socketRef.current.emit('student:join_deck', { deckUid: pin, studentDetails: { name: userName, email: userEmail, uid: userUid } });
-                               } else {
-                                  alert("Please enter a valid 6-digit Deck PIN.");
-                               }
-                             }}
-                             className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-space rounded-xl transition-colors shrink-0"
-                           >
-                             Join
-                           </button>
-                        </div>
-                        <div className="pt-4 border-t border-white/[0.05]">
-                           <p className="text-xs text-emerald-500/60 font-bold uppercase tracking-widest">Waiting for materials...</p>
+                        <div className="text-[10px] text-gray-400 font-semibold flex items-center gap-2">
+                          <span>Professor is presenting</span>
                         </div>
                       </div>
-                    ) : activeMode === 'whiteboard' ? (
-                      <div className="w-full h-full bg-[#080b09]/80 border border-emerald-500/20 p-4 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.08)] backdrop-blur-md flex flex-col animate-fadeIn">
-                        <div className="mb-4 flex items-center justify-between border-b border-white/[0.05] pb-4">
-                          <h3 className="text-xl font-extrabold text-white font-space">Live Whiteboard Sync</h3>
-                          <p className="text-xs text-emerald-400 uppercase tracking-widest mt-1 font-bold">Watch Professor Live</p>
-                        </div>
-                        <div className="flex-1 w-full rounded-xl overflow-hidden relative border border-white/[0.06] bg-[#0a0f0c] min-h-[400px]">
+
+                      <div className="border border-white/[0.08] bg-[#050907]/90 rounded-2xl flex-1 relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] flex flex-col min-h-0">
+                        <div className="flex-1 w-full h-full relative overflow-hidden select-none">
                           <canvas
                             ref={liveCanvasRef}
-                            className="absolute inset-0 w-full h-full"
+                            className="absolute inset-0 block w-full h-full"
                           />
+                          <div className="absolute bottom-4 left-4 pointer-events-none bg-black/50 border border-white/[0.06] backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] text-gray-400 font-semibold shadow-md">
+                            <span>Read-only synced board</span>
+                          </div>
                         </div>
                       </div>
-                    ) : pdfUrl ? (
-                      <div className="w-full h-full bg-[#080b09]/80 border border-emerald-500/20 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.08)] backdrop-blur-md flex flex-col overflow-hidden animate-fadeIn">
-                        <div className="px-5 py-3.5 flex items-center justify-between border-b border-white/[0.05] bg-[#0b100d] shrink-0 text-xs text-gray-300">
-                          <div className="flex items-center gap-3">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" strokeWidth="2.5">
-                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
-                              <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                            <span className="font-extrabold font-space truncate max-w-[150px] sm:max-w-xs text-white">{pdfName}</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-3">
-                            <span className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded text-[10px] text-emerald-400 font-extrabold font-space uppercase">
-                              Slide Page {currentPage}
-                            </span>
-                            <span className="text-[9px] font-black tracking-widest text-[#10b981] bg-[#10b981]/15 px-2.5 py-1 rounded uppercase font-space border border-[#10b981]/30">
-                              Synced Live
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex-1 w-full bg-[#181c19] overflow-hidden min-h-[400px]">
-                          <iframe 
-                            src={`${pdfUrl}#page=${currentPage}`} 
-                            className="w-full h-full border-none bg-white" 
-                            title="Synced PDF Document"
+                    </div>
+
+                    {/* RIGHT COLUMN: Sidebar (Submit Doubt & Synced Chat) (4 columns) */}
+                    <div className="lg:col-span-4 flex flex-col space-y-4 min-h-0 max-h-full">
+                      
+                      {/* Ask a Doubt Panel */}
+                      <div className="border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col shrink-0 shadow-lg">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space border-b border-white/[0.06] pb-2">
+                          Ask a Doubt
+                        </h4>
+                        <div className="mt-3 space-y-2">
+                          <textarea
+                            value={deckDoubtInput}
+                            onChange={(e) => setDeckDoubtInput(e.target.value)}
+                            placeholder="Type your doubt here for the Professor..."
+                            rows={3}
+                            className="w-full bg-black/60 border border-white/10 focus:border-emerald-500/60 rounded-xl p-3 text-xs text-white placeholder-gray-500 focus:outline-none leading-relaxed resize-none font-semibold"
                           />
+                          <button
+                            onClick={() => {
+                              if (!deckDoubtInput.trim()) return;
+                              const doubt = {
+                                id: Date.now().toString(),
+                                studentName: userName,
+                                text: deckDoubtInput,
+                                timestamp: new Date().toLocaleTimeString()
+                              };
+                              if (socketRef.current) {
+                                socketRef.current.emit('deck:submit_doubt', { deckUid: deckPin, doubt });
+                                alert('Doubt submitted to Professor!');
+                              }
+                              setDeckDoubtInput('');
+                            }}
+                            className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-[11px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md font-space"
+                          >
+                            Send Doubt
+                          </button>
                         </div>
                       </div>
-                    ) : liveMaterial ? (
-                      <div className="w-full bg-[#080b09]/80 border border-emerald-500/20 p-8 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.08)] backdrop-blur-md animate-fadeIn">
-                        <div className="mb-8 border-b border-white/[0.05] pb-4">
-                          <h3 className="text-xl font-extrabold text-white font-space">{liveMaterial.title}</h3>
-                          <p className="text-xs text-emerald-400 uppercase tracking-widest mt-1 font-bold">Interactive {liveMaterial.type}</p>
-                        </div>
-                        
-                        {liveMaterial.type === 'diagram' && liveMaterial.content && liveMaterial.content.nodes ? (
-                          <div className="flex flex-col md:flex-row items-center justify-center gap-4 py-10">
-                            {liveMaterial.content.nodes.map((node, idx) => (
-                              <div key={idx} className="flex items-center gap-4">
-                                <motion.div 
-                                  initial={{ scale: 0.8, opacity: 0 }}
-                                  animate={{ scale: 1, opacity: 1 }}
-                                  transition={{ delay: idx * 0.15 }}
-                                  className="px-6 py-4 bg-emerald-950/30 border border-emerald-500/40 rounded-xl text-center min-w-[140px] shadow-[0_0_20px_rgba(16,185,129,0.15)]"
-                                >
-                                  <p className="text-[10px] text-emerald-400 uppercase font-black font-space tracking-wider">{node.type}</p>
-                                  <p className="text-sm text-white font-bold mt-1.5">{node.label}</p>
-                                </motion.div>
-                                {idx < liveMaterial.content.nodes.length - 1 && (
-                                  <span className="text-emerald-500/60 font-black hidden md:inline">→</span>
-                                )}
+
+                      {/* Synced Room Chat */}
+                      <div className="border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-0 flex-1 shadow-lg">
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space border-b border-white/[0.06] pb-2 shrink-0">
+                          Classroom Chat
+                        </h4>
+
+                        <div className="flex-1 overflow-y-auto space-y-2.5 my-3 pr-1 text-[11px] custom-sidebar-scroll">
+                          {deckChatMessages.length === 0 ? (
+                            <div className="h-full flex items-center justify-center text-gray-500 text-[10px] italic">
+                              Chat logs are empty.
+                            </div>
+                          ) : (
+                            deckChatMessages.map((msg, idx) => (
+                              <div
+                                key={idx}
+                                className={`flex flex-col max-w-[85%] rounded-xl px-3 py-2 border ${
+                                  msg.sender === userName
+                                    ? 'bg-emerald-500/10 border-emerald-500/25 text-white ml-auto text-right'
+                                    : 'bg-white/[0.04] border-white/[0.08] text-gray-200 mr-auto text-left'
+                                }`}
+                              >
+                                <span className="text-[8px] font-bold text-gray-500">{msg.sender} • {msg.timestamp}</span>
+                                <p className="mt-0.5 font-semibold leading-relaxed select-text">{msg.text}</p>
                               </div>
-                            ))}
-                          </div>
-                        ) : liveMaterial.type === 'chart' && liveMaterial.content && liveMaterial.content.chartData ? (
-                          <div className="w-full max-w-lg mx-auto space-y-5 py-6">
-                            {liveMaterial.content.chartData.map((item, idx) => (
-                              <div key={idx} className="space-y-1.5">
-                                <div className="flex justify-between text-sm text-gray-200 font-bold">
-                                  <span>{item.label}</span>
-                                  <span className="text-emerald-400">{item.value}%</span>
-                                </div>
-                                <div className="w-full bg-[#121614] h-3.5 rounded-full overflow-hidden border border-white/[0.04]">
-                                  <motion.div 
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${item.value}%` }}
-                                    transition={{ duration: 1, delay: idx * 0.1, ease: 'easeOut' }}
-                                    className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full shadow-[0_0_12px_rgba(16,185,129,0.6)]" 
-                                  />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center p-10">
-                            <p className="text-gray-300 font-mono text-sm break-words whitespace-pre-wrap">{JSON.stringify(liveMaterial.content, null, 2)}</p>
-                          </div>
-                        )}
+                            ))
+                          )}
+                          <div ref={deckChatEndRef} />
+                        </div>
+
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (!deckChatInput.trim()) return;
+                            const msg = {
+                              sender: userName,
+                              text: deckChatInput,
+                              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            };
+                            if (socketRef.current) {
+                              socketRef.current.emit('deck:chat_message', { deckUid: deckPin, message: msg });
+                            }
+                            setDeckChatInput('');
+                          }}
+                          className="flex gap-2 shrink-0"
+                        >
+                          <input
+                            type="text"
+                            value={deckChatInput}
+                            onChange={(e) => setDeckChatInput(e.target.value)}
+                            placeholder="Message class..."
+                            className="flex-1 bg-black/60 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                          />
+                          <button
+                            type="submit"
+                            className="px-3 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl font-bold flex items-center justify-center transition-colors cursor-pointer"
+                          >
+                            <HiOutlineChat size={14} />
+                          </button>
+                        </form>
                       </div>
-                    ) : (
-                      <div className="text-center space-y-6 my-16 max-w-md w-full bg-[#080b09]/80 border border-emerald-500/10 p-8 rounded-2xl shadow-xl backdrop-blur-md animate-fadeIn">
-                        <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
-                          <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ping" />
-                          <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/35 flex items-center justify-center text-emerald-400">
-                            <HiOutlineSparkles size={24} className="animate-pulse" />
-                          </div>
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-white font-space">Classroom is Live</h3>
-                          <p className="text-sm text-gray-400 mt-2 font-semibold">
-                            Connected to Flight Deck. Waiting for the Professor to present slides or start whiteboard.
-                          </p>
-                        </div>
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Lobby Sync Active</span>
-                        </div>
-                      </div>
-                    )}
+
+                    </div>
                   </div>
-                </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

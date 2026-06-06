@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -29,6 +29,33 @@ export default function LoginPage() {
     return localStorage.getItem('colorTheme') || 'fresh'
   })
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mockRole = params.get('mock_role');
+    if (mockRole === 'teacher') {
+      localStorage.setItem('userEmail', 'teacher@school.edu');
+      localStorage.setItem('userInfo', JSON.stringify({
+        _id: 'test-teacher-id',
+        name: 'Teacher Acharya',
+        role: 'Teacher',
+        email: 'teacher@school.edu',
+        token: 'mock-jwt-token'
+      }));
+      window.location.href = '/professor-dashboard';
+    } else if (mockRole === 'student') {
+      localStorage.setItem('userEmail', 'student@school.edu');
+      localStorage.setItem('userInfo', JSON.stringify({
+        _id: 'test-student-id',
+        name: 'Student Rahul',
+        role: 'Student',
+        email: 'student@school.edu',
+        uid: 'STU-123',
+        token: 'mock-jwt-token'
+      }));
+      window.location.href = '/student-dashboard';
+    }
+  }, []);
 
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect()
