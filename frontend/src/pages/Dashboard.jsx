@@ -170,7 +170,7 @@ export default function Dashboard() {
   const [weeklyActivity, setWeeklyActivity] = useState(() => {
     return parseInt(localStorage.getItem('stats_weeklyActivity') || '0', 10)
   })
-  const navigate = useNavigate()
+
 
   useEffect(() => {
     localStorage.setItem('stats_totalTopics', totalTopics.toString())
