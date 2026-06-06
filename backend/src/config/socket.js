@@ -3,6 +3,8 @@ import Poll from '../models/Poll.js';
 
 
 const classroomQueues = {};
+const coopRooms = {};
+const matchmakingQueue = [];
 
 export const initSocket = (server) => {
   const io = new Server(server, {
@@ -34,8 +36,165 @@ export const initSocket = (server) => {
     });
 
 
-    socket.on('draw', (drawData) => {
+    // ── MULTI-PLAYER CO-OP MATCHMAKING & SOCKET ROOMS ──
+    socket.on('coop:join_queue', ({ userId, userName, courseId }) => {
+      // Remove any existing duplicate queue entries
+      const existingIdx = matchmakingQueue.findIndex(q => q.userId === userId);
+      if (existingIdx !== -1) {
+        matchmakingQueue.splice(existingIdx, 1);
+      }
 
+      // Add student to the matching queue
+      matchmakingQueue.push({
+        socket,
+        userId,
+        userName,
+        courseId
+      });
+
+      console.log(`[Socket] Student ${userName} (${userId}) joined matchmaking queue for course: ${courseId}`);
+
+      // Try to match with another active student on the same courseId
+      const partner = matchmakingQueue.find(q => q.courseId === courseId && q.userId !== userId);
+
+      if (partner) {
+        // Remove both students from queue
+        const idxA = matchmakingQueue.findIndex(q => q.userId === userId);
+        if (idxA !== -1) matchmakingQueue.splice(idxA, 1);
+        const idxB = matchmakingQueue.findIndex(q => q.userId === partner.userId);
+        if (idxB !== -1) matchmakingQueue.splice(idxB, 1);
+
+        const roomId = `coop_room_${userId}_${partner.userId}`;
+        socket.join(roomId);
+        partner.socket.join(roomId);
+
+        socket.coopRoomId = roomId;
+        partner.socket.coopRoomId = roomId;
+
+        coopRooms[roomId] = {
+          studentA: { userId, userName, socketId: socket.id },
+          studentB: { userId: partner.userId, userName: partner.userName, socketId: partner.socket.id },
+          isMock: false
+        };
+
+        // Notify both sockets in the room
+        io.to(roomId).emit('coop:matched', {
+          roomId,
+          partnerName: partner.userName,
+          partnerId: partner.userId,
+          playerA: { userId, userName },
+          playerB: { userId: partner.userId, userName: partner.userName }
+        });
+
+        // Redundant direct emits to enforce state transitions on clients
+        socket.emit('coop:matched', {
+          roomId,
+          partnerName: partner.userName,
+          partnerId: partner.userId,
+          playerA: { userId, userName },
+          playerB: { userId: partner.userId, userName: partner.userName }
+        });
+        partner.socket.emit('coop:matched', {
+          roomId,
+          partnerName: userName,
+          partnerId: userId,
+          playerA: { userId: partner.userId, userName: partner.userName },
+          playerB: { userId, userName }
+        });
+
+        console.log(`[Socket] Real match established between ${userName} and ${partner.userName} in room ${roomId}`);
+      } else {
+        // Setup AI Study Partner mock fallback after 6 seconds if no real user matches
+        setTimeout(() => {
+          const stillInQueueIdx = matchmakingQueue.findIndex(q => q.userId === userId && q.socket.id === socket.id);
+          if (stillInQueueIdx !== -1) {
+            matchmakingQueue.splice(stillInQueueIdx, 1);
+
+            const roomId = `coop_room_mock_${userId}`;
+            socket.join(roomId);
+            socket.coopRoomId = roomId;
+
+            coopRooms[roomId] = {
+              studentA: { userId, userName, socketId: socket.id },
+              studentB: { userId: 'mock-ai-partner', userName: 'Arya (AI Study Partner)', socketId: null },
+              isMock: true
+            };
+
+            socket.emit('coop:matched', {
+              roomId,
+              partnerName: 'Arya (AI Study Partner)',
+              partnerId: 'mock-ai-partner',
+              playerA: { userId, userName },
+              playerB: { userId: 'mock-ai-partner', userName: 'Arya (AI Study Partner)' }
+            });
+
+            console.log(`[Socket] Matchmaking timeout. Paired ${userName} with Arya (AI Study Partner) in room ${roomId}`);
+          }
+        }, 6000);
+      }
+    });
+
+    socket.on('coop:leave_queue', ({ userId }) => {
+      const idx = matchmakingQueue.findIndex(q => q.userId === userId);
+      if (idx !== -1) {
+        matchmakingQueue.splice(idx, 1);
+        console.log(`[Socket] Student ${userId} cancelled matching queue`);
+      }
+    });
+
+    socket.on('coop:draw', (drawData) => {
+      if (socket.coopRoomId) {
+        socket.to(socket.coopRoomId).emit('coop:draw', drawData);
+      }
+    });
+
+    socket.on('coop:clear_canvas', () => {
+      if (socket.coopRoomId) {
+        socket.to(socket.coopRoomId).emit('coop:clear_canvas');
+      }
+    });
+
+    socket.on('coop:chat_message', (msg) => {
+      if (socket.coopRoomId) {
+        socket.to(socket.coopRoomId).emit('coop:chat_message', msg);
+
+        // If matched with Arya, simulate a responsive co-op student dialog after 1.5 seconds
+        const room = coopRooms[socket.coopRoomId];
+        if (room && room.isMock) {
+          setTimeout(() => {
+            const aiMessages = [
+              "Nice work! Your canvas sketches look clean. Let's finish the drawing.",
+              "I see you added a drawing! Let me add some details too.",
+              "That looks correct. Let's complete the assignment to claim our Credits!",
+              "Awesome! I am active. Let's hit the Complete Mission button when you are ready.",
+              "Let's sync up! I am working on the whiteboard now."
+            ];
+            const randomMsg = aiMessages[Math.floor(Math.random() * aiMessages.length)];
+            socket.emit('coop:chat_message', {
+              sender: 'Arya (AI)',
+              role: 'Student',
+              text: randomMsg,
+              timestamp: new Date().toLocaleTimeString()
+            });
+          }, 1500);
+        }
+      }
+    });
+
+    socket.on('coop:sync_progress', (data) => {
+      if (socket.coopRoomId) {
+        socket.to(socket.coopRoomId).emit('coop:sync_progress', data);
+      }
+    });
+
+    socket.on('coop:complete_mission', () => {
+      if (socket.coopRoomId) {
+        io.to(socket.coopRoomId).emit('coop:complete_mission');
+      }
+    });
+
+
+    socket.on('draw', (drawData) => {
       if (socket.classroomId) {
         socket.to(socket.classroomId).emit('draw', drawData);
       }
@@ -98,10 +257,8 @@ export const initSocket = (server) => {
         );
 
         if (existingVoteIndex !== -1) {
-
           poll.votes[existingVoteIndex].optionIndex = optionIndex;
         } else {
-
           poll.votes.push({ studentId: userId, optionIndex });
         }
 
@@ -138,6 +295,18 @@ export const initSocket = (server) => {
 
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.id}`);
+
+      // Handle matchmaking queue cleanup
+      const qIdx = matchmakingQueue.findIndex(q => q.socket.id === socket.id);
+      if (qIdx !== -1) {
+        matchmakingQueue.splice(qIdx, 1);
+      }
+
+      // Handle active co-op room disconnect
+      if (socket.coopRoomId && coopRooms[socket.coopRoomId]) {
+        socket.to(socket.coopRoomId).emit('coop:partner_disconnected');
+        delete coopRooms[socket.coopRoomId];
+      }
 
       const { classroomId, userId } = socket;
       if (classroomId && userId && classroomQueues[classroomId]) {

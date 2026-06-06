@@ -465,6 +465,7 @@ export default function Dashboard() {
     { id: 'digitizer', name: 'Paper Digitizer', icon: HiOutlineDocumentText, description: 'Digitize handwritten exams & assignments' },
     { id: 'visual-aids', name: 'Visual Aids', icon: HiOutlineSparkles, description: 'Create engaging diagrams and charts for your lessons' },
     { id: 'math-helper', name: 'Math Helper', icon: HiOutlineCalculator, description: 'Solve any math problem with step-by-step explanations' },
+    { id: 'course-creator', name: 'Branching Course Creator', icon: HiOutlineBookOpen, description: 'Create and deploy custom branching syllabus routes for students' },
   ]
 
   const renderContent = () => {
@@ -600,6 +601,16 @@ export default function Dashboard() {
             setMemberSince={setMemberSince}
             userPicture={userPicture}
             setUserPicture={setUserPicture}
+          />
+        )
+      case 'course-creator':
+        return (
+          <BranchingCourseCreator
+            showToast={showToast}
+            onCourseCreated={() => {
+              setTotalTopics(prev => prev + 1)
+              setWeeklyActivity(prev => prev + 1)
+            }}
           />
         )
       default:
@@ -4383,6 +4394,247 @@ export function SettingsView({
       </div>
     </motion.div>
   )
+}
+
+export function BranchingCourseCreator({ showToast, onCourseCreated }) {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [chapters, setChapters] = useState([
+    {
+      chapterTitle: 'Chapter 1: Foundations',
+      mainVideoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+      quizQuestion: 'Supervised learning works with what kind of data?',
+      quizOptions: ['Labeled Data', 'Unlabeled Data', 'Simulated Environment Data', 'Feedback Reward Data'],
+      quizCorrectIndex: 0,
+      advancedVideoUrl: 'https://www.w3schools.com/html/movie.mp4',
+      remedialVideoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    }
+  ]);
+
+  const handleAddChapter = () => {
+    setChapters([...chapters, {
+      chapterTitle: `Chapter ${chapters.length + 1}: Topic Name`,
+      mainVideoUrl: '',
+      quizQuestion: '',
+      quizOptions: ['', '', '', ''],
+      quizCorrectIndex: 0,
+      advancedVideoUrl: '',
+      remedialVideoUrl: '',
+    }]);
+  };
+
+  const handleChapterChange = (index, field, value) => {
+    const updated = [...chapters];
+    updated[index][field] = value;
+    setChapters(updated);
+  };
+
+  const handleOptionChange = (chIdx, optIdx, val) => {
+    const updated = [...chapters];
+    updated[chIdx].quizOptions[optIdx] = val;
+    setChapters(updated);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!title) {
+      showToast('Course Title is required', 'error');
+      return;
+    }
+
+    try {
+      const savedInfo = localStorage.getItem('userInfo');
+      if (!savedInfo) return;
+      const info = JSON.parse(savedInfo);
+      if (!info.token) return;
+
+      const res = await fetch(`${API_URL}/api/courses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${info.token}`
+        },
+        body: JSON.stringify({ title, description, chapters })
+      });
+
+      if (res.ok) {
+        showToast('Adaptive Branching Course Published Successfully!', 'success');
+        setTitle('');
+        setDescription('');
+        setChapters([
+          {
+            chapterTitle: 'Chapter 1: Foundations',
+            mainVideoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+            quizQuestion: 'Supervised learning works with what kind of data?',
+            quizOptions: ['Labeled Data', 'Unlabeled Data', 'Simulated Environment Data', 'Feedback Reward Data'],
+            quizCorrectIndex: 0,
+            advancedVideoUrl: 'https://www.w3schools.com/html/movie.mp4',
+            remedialVideoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+          }
+        ]);
+        if (onCourseCreated) onCourseCreated();
+      } else {
+        const err = await res.json();
+        showToast(err.message || 'Failed to publish course', 'error');
+      }
+    } catch (err) {
+      showToast('Error publishing branching course', 'error');
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-6 bg-[#070b09]/50 border border-white/[0.08] rounded-3xl space-y-6"
+    >
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-black text-white font-space">Branching Course Creator (Teacher Panel)</h2>
+          <p className="text-xs text-gray-400 mt-1">Design an adaptive syllabus with seamless branching based on student micro-quizzes.</p>
+        </div>
+        <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-md text-[10px] font-bold uppercase font-space">
+          Adaptive Engine
+        </span>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6 text-xs font-semibold">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-gray-400">Course Syllabus Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Applied Neural Networks"
+              className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-gray-400">Brief Description</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Multi-path curriculum using micro-quizzes"
+              className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex justify-between items-center border-t border-white/[0.08] pt-4">
+            <h3 className="text-sm font-extrabold text-white font-space">Course Chapters ({chapters.length})</h3>
+            <button
+              type="button"
+              onClick={handleAddChapter}
+              className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/35 hover:bg-emerald-500/25 text-emerald-400 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+            >
+              + Add Chapter Node
+            </button>
+          </div>
+
+          {chapters.map((ch, chIdx) => (
+            <div key={chIdx} className="bg-white/[0.02] border border-white/[0.06] p-5 rounded-2xl space-y-4 relative">
+              <div className="flex justify-between items-center">
+                <input
+                  type="text"
+                  value={ch.chapterTitle}
+                  onChange={(e) => handleChapterChange(chIdx, 'chapterTitle', e.target.value)}
+                  className="bg-transparent border-b border-white/10 font-bold text-white text-xs focus:outline-none focus:border-emerald-500 w-1/2 py-0.5"
+                />
+                <span className="text-[10px] text-gray-500 font-space">Node #{chIdx + 1}</span>
+              </div>
+
+              {/* Videos Row */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-gray-500">Main Video Link (Standard Path)</label>
+                  <input
+                    type="text"
+                    value={ch.mainVideoUrl}
+                    onChange={(e) => handleChapterChange(chIdx, 'mainVideoUrl', e.target.value)}
+                    placeholder="https://example.com/video.mp4"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-gray-500 text-emerald-400">Advanced Video Link (Correct Path)</label>
+                  <input
+                    type="text"
+                    value={ch.advancedVideoUrl}
+                    onChange={(e) => handleChapterChange(chIdx, 'advancedVideoUrl', e.target.value)}
+                    placeholder="https://example.com/advanced.mp4"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-gray-500 text-orange-400">Remedial Video Link (Incorrect Path)</label>
+                  <input
+                    type="text"
+                    value={ch.remedialVideoUrl}
+                    onChange={(e) => handleChapterChange(chIdx, 'remedialVideoUrl', e.target.value)}
+                    placeholder="https://example.com/remedial.mp4"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Quiz Settings */}
+              <div className="border-t border-white/[0.04] pt-4 space-y-3">
+                <div className="space-y-1">
+                  <label className="text-gray-500">Micro-Quiz Question Popup</label>
+                  <input
+                    type="text"
+                    value={ch.quizQuestion}
+                    onChange={(e) => handleChapterChange(chIdx, 'quizQuestion', e.target.value)}
+                    placeholder="Ask a quick verification question..."
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    required
+                  />
+                </div>
+
+                {/* Options and correct index selection */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {ch.quizOptions.map((opt, optIdx) => (
+                    <div key={optIdx} className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name={`correct-${chIdx}`}
+                        checked={ch.quizCorrectIndex === optIdx}
+                        onChange={() => handleChapterChange(chIdx, 'quizCorrectIndex', optIdx)}
+                        className="accent-emerald-500 shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={opt}
+                        onChange={(e) => handleOptionChange(chIdx, optIdx, e.target.value)}
+                        placeholder={`Option ${optIdx + 1}`}
+                        className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          type="submit"
+          className="w-full py-4 bg-gradient-to-r from-emerald-500 to-green-400 text-black text-xs font-black uppercase tracking-wider rounded-2xl hover:scale-[1.01] transition-transform cursor-pointer"
+        >
+          Publish Adaptive Branching Course
+        </button>
+      </form>
+    </motion.div>
+  );
 }
 
 

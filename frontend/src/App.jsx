@@ -4,6 +4,7 @@ import './index.css'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
+import StudentDashboard from './pages/StudentDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id-here';
@@ -19,6 +20,7 @@ export default function App() {
           {/* Protected Routes Group */}
           <Route element={<ProtectedRoute />}>
             <Route path="/professor-dashboard" element={<Dashboard />} />
+            <Route path="/student-dashboard" element={<StudentDashboard />} />
           </Route>
         </Routes>
       </BrowserRouter>

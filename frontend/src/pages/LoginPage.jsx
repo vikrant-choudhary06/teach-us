@@ -22,6 +22,7 @@ const features = [
 ]
 
 export default function LoginPage() {
+  const [role, setRole] = useState('Teacher')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [colorTheme] = useState(() => {
@@ -63,7 +64,7 @@ export default function LoginPage() {
       const res = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: credential, role: 'Teacher' }),
+        body: JSON.stringify({ token: credential, role }),
       })
 
       const data = await res.json()
@@ -80,7 +81,12 @@ export default function LoginPage() {
         ...data,
         picture: data.picture || googlePicture
       }))
-      navigate('/professor-dashboard')
+      
+      if (data.role === 'Student') {
+        navigate('/student-dashboard')
+      } else {
+        navigate('/professor-dashboard')
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -227,6 +233,32 @@ export default function LoginPage() {
             <p className="text-xs text-gray-400 font-semibold max-w-[280px] mx-auto leading-relaxed">
               Secure, single sign-on using your institutional Google account.
             </p>
+          </div>
+
+          {/* Glassmorphic Teacher/Student Toggle Selector */}
+          <div className="w-full flex p-1 bg-white/[0.03] border border-white/[0.08] rounded-xl mb-6 font-space">
+            <button
+              type="button"
+              onClick={() => setRole('Teacher')}
+              className={`flex-1 text-center py-2.5 rounded-lg text-xs font-bold transition-all duration-300 cursor-pointer ${
+                role === 'Teacher'
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-400 text-black shadow-[0_2px_10px_rgba(16,185,129,0.35)] font-extrabold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Teacher / Educator
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole('Student')}
+              className={`flex-1 text-center py-2.5 rounded-lg text-xs font-bold transition-all duration-300 cursor-pointer ${
+                role === 'Student'
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-400 text-black shadow-[0_2px_10px_rgba(16,185,129,0.35)] font-extrabold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Student Portal
+            </button>
           </div>
 
           {/* Interactive Google Sign In Button Container */}
