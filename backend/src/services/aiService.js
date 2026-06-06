@@ -260,8 +260,10 @@ export const generateVisualAidWithAI = async (promptText, type) => {
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const stylePrompt = type === 'diagram' 
-      ? 'Create a valid Mermaid.js flowchart markdown string. Do NOT write full HTML, only the Mermaid graph syntax (e.g., graph TD; A-->B;).' 
-      : 'Create a clean structured dataset for a bar/pie chart representing the requested statistics (e.g. Labels: [...], Values: [...]).';
+      ? `Create a structured dataset for a flowchart.
+         JSON "data" format: { "nodes": [{ "type": "Start", "label": "Step 1" }, { "type": "Process", "label": "Step 2" }] }`
+      : `Create a clean structured dataset for a bar/pie chart representing the requested statistics.
+         JSON "data" format: { "chartData": [{ "label": "Category A", "value": 45 }, { "label": "Category B", "value": 55 }] }`;
 
     const promptBody = `
       You are the ClassOS AI Visual Aid Generator.
@@ -271,10 +273,11 @@ export const generateVisualAidWithAI = async (promptText, type) => {
       Requirement:
       ${stylePrompt}
       
-      Return your output strictly as a JSON object matching this structure:
+      Return your output strictly as a valid JSON object matching this exact structure:
       {
-        "title": "Visual Aid Title",
-        "data": "The mermaid code string or structured chart config string/data..."
+        "title": "A short engaging title for the visual aid",
+        "type": "${type}",
+        "data": { /* See stylePrompt for exact structure */ }
       }
       Do NOT wrap the JSON inside markdown code blocks (e.g. \`\`\`json). Return ONLY the raw valid JSON string.
     `;
