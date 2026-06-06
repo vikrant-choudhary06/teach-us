@@ -50,6 +50,15 @@ export default function Dashboard() {
   const [deckUid, setDeckUid] = useState(null)
   const navigate = useNavigate()
 
+  // Lifted Live Flight Deck States to survive tab switches
+  const [isDeckLive, setIsDeckLive] = useState(false)
+  const [deckPin, setDeckPin] = useState('')
+  const [deckJoinedStudents, setDeckJoinedStudents] = useState([])
+  const [deckDoubts, setDeckDoubts] = useState([])
+  const [deckChatMessages, setDeckChatMessages] = useState([])
+  const [deckWhiteboardHistory, setDeckWhiteboardHistory] = useState([])
+  const [deckHistoryIndex, setDeckHistoryIndex] = useState(0)
+
   useEffect(() => {
     const savedInfo = localStorage.getItem('userInfo')
     if (savedInfo) {
@@ -71,32 +80,31 @@ export default function Dashboard() {
     const newDeckUid = Math.floor(100000 + Math.random() * 900000).toString()
     setDeckUid(newDeckUid)
 
-    socketRef.current.on('connect', () => {
-      socketRef.current.emit('teacher:start_deck', { deckUid: newDeckUid })
-    })
+    // Register globally-active Live Flight Deck listeners
+    socketRef.current.on('teacher:update_students', (studentsList) => {
+      setDeckJoinedStudents(studentsList || []);
+    });
 
-    socketRef.current.on('teacher:student_joined', (studentDetails) => {
-      // Re-fetch students when a student joins via Deck PIN
-      const savedInfo = localStorage.getItem('userInfo')
-      if (savedInfo) {
-        const info = JSON.parse(savedInfo)
-        if (info.token) {
-          fetch(`${API_URL}/api/students`, { headers: { 'Authorization': `Bearer ${info.token}` } })
-            .then(res => res.json())
-            .then(data => {
-               // A simplified mapping to keep UI sync without complex state mgmt
-               if (Array.isArray(data)) {
-                 // The actual UI update happens when data is fetched, but we can't easily trigger the setStudents from here without moving the refetch function out.
-                 // For now, we will just show a toast and rely on the next refresh or we can duplicate the fetch logic.
-                 alert(`A student has joined your Deck via PIN!`)
-               }
-            })
-        }
-      }
-    })
+    socketRef.current.on('deck:doubt_received', (doubt) => {
+      setDeckDoubts(prev => [...prev, doubt]);
+    });
+
+    socketRef.current.on('deck:doubt_resolved', (doubtId) => {
+      setDeckDoubts(prev => prev.filter(d => d.id !== doubtId));
+    });
+
+    socketRef.current.on('deck:chat_message', (msg) => {
+      setDeckChatMessages(prev => [...prev, msg]);
+    });
 
     return () => {
-      if (socketRef.current) socketRef.current.disconnect()
+      if (socketRef.current) {
+        socketRef.current.off('teacher:update_students');
+        socketRef.current.off('deck:doubt_received');
+        socketRef.current.off('deck:doubt_resolved');
+        socketRef.current.off('deck:chat_message');
+        socketRef.current.disconnect();
+      }
     }
   }, [])
 
@@ -619,6 +627,20 @@ export default function Dashboard() {
             deployedMaterial={deployedMaterial}
             setDeployedMaterial={setDeployedMaterial}
             handleAddStudent={handleAddStudent}
+            isLive={isDeckLive}
+            setIsLive={setIsDeckLive}
+            deckPin={deckPin}
+            setDeckPin={setDeckPin}
+            joinedStudents={deckJoinedStudents}
+            setJoinedStudents={setDeckJoinedStudents}
+            doubts={deckDoubts}
+            setDoubts={setDeckDoubts}
+            chatMessages={deckChatMessages}
+            setChatMessages={setDeckChatMessages}
+            whiteboardHistory={deckWhiteboardHistory}
+            setWhiteboardHistory={setDeckWhiteboardHistory}
+            historyIndex={deckHistoryIndex}
+            setHistoryIndex={setDeckHistoryIndex}
           />
         )
       case 'math-helper':
@@ -1369,21 +1391,30 @@ function LiveFlightDeck({
   pushWorksheetToClass,
   deployedMaterial,
   setDeployedMaterial,
-  handleAddStudent
+  handleAddStudent,
+  
+  // Destructured props from parent Dashboard component
+  isLive,
+  setIsLive,
+  deckPin,
+  setDeckPin,
+  joinedStudents,
+  setJoinedStudents,
+  doubts,
+  setDoubts,
+  chatMessages,
+  setChatMessages,
+  whiteboardHistory,
+  setWhiteboardHistory,
+  historyIndex,
+  setHistoryIndex
 }) {
-  const [isLive, setIsLive] = useState(false);
-  const [deckPin, setDeckPin] = useState('');
-  const [joinedStudents, setJoinedStudents] = useState([]);
-  const [doubts, setDoubts] = useState([]);
-  const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   
-  // Whiteboard States
+  // Whiteboard States (UI/Drawing Configuration remain local/transient)
   const [tool, setTool] = useState('pencil'); // 'pencil' | 'line' | 'rect' | 'circle' | 'eraser' | 'text'
   const [brushColor, setBrushColor] = useState('#10b981');
   const [brushWidth, setBrushWidth] = useState(4);
-  const [whiteboardHistory, setWhiteboardHistory] = useState([]);
-  const [historyIndex, setHistoryIndex] = useState(0);
   
   // Drawing internal refs & states
   const [isDrawing, setIsDrawing] = useState(false);
@@ -1401,35 +1432,6 @@ function LiveFlightDeck({
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages]);
-
-  // Handle server updates
-  useEffect(() => {
-    if (!socketRef.current) return;
-    const socket = socketRef.current;
-
-    socket.on('teacher:update_students', (studentsList) => {
-      setJoinedStudents(studentsList || []);
-    });
-
-    socket.on('deck:doubt_received', (doubt) => {
-      setDoubts(prev => [...prev, doubt]);
-    });
-
-    socket.on('deck:doubt_resolved', (doubtId) => {
-      setDoubts(prev => prev.filter(d => d.id !== doubtId));
-    });
-
-    socket.on('deck:chat_message', (msg) => {
-      setChatMessages(prev => [...prev, msg]);
-    });
-
-    return () => {
-      socket.off('teacher:update_students');
-      socket.off('deck:doubt_received');
-      socket.off('deck:doubt_resolved');
-      socket.off('deck:chat_message');
-    };
-  }, [socketRef]);
 
   // Redraw canvas on history changes or resize
   useEffect(() => {

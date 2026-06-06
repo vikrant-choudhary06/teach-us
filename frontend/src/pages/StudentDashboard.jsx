@@ -216,7 +216,7 @@ export default function StudentDashboard() {
     if (isJoined && liveCanvasRef.current) {
       redrawLiveCanvas();
     }
-  }, [deckWhiteboardHistory, isJoined]);
+  }, [deckWhiteboardHistory, isJoined, activeTab]);
 
   useEffect(() => {
     if (deckChatEndRef.current) {
