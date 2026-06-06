@@ -49,6 +49,8 @@ export default function Navbar() {
     { label: 'About Us', href: '#about-us' },
   ];
 
+  const dashboardPath = userInfo?.role === 'Student' ? '/student-dashboard' : '/professor-dashboard';
+
   return (
     <nav className="fixed top-4 left-0 right-0 z-50 px-4 transition-all duration-300">
       <div className={`max-w-5xl mx-auto transition-all duration-300 ${
@@ -89,7 +91,7 @@ export default function Navbar() {
           {userEmail ? (
             <div className="hidden md:flex items-center gap-5 relative">
               <Link
-                to="/professor-dashboard"
+                to={dashboardPath}
                 className="bg-white hover:bg-gray-100 text-black font-extrabold text-xs px-5 py-2.5 rounded-full transition-all duration-300 shadow-md active:scale-95 font-space uppercase tracking-wider"
               >
                 Dashboard
@@ -205,7 +207,7 @@ export default function Navbar() {
                       </div>
                     </div>
                     <Link
-                      to="/professor-dashboard"
+                      to={dashboardPath}
                       className="w-full bg-white hover:bg-gray-100 text-black font-semibold text-center py-3 rounded-full transition-all duration-300 text-sm shadow-md"
                       onClick={() => setIsOpen(false)}
                     >
