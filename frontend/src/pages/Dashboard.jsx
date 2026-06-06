@@ -58,6 +58,9 @@ export default function Dashboard() {
   const [deckChatMessages, setDeckChatMessages] = useState([])
   const [deckWhiteboardHistory, setDeckWhiteboardHistory] = useState([])
   const [deckHistoryIndex, setDeckHistoryIndex] = useState(0)
+  const [deckIsSharingWhiteboard, setDeckIsSharingWhiteboard] = useState(false)
+  const [deckZoom, setDeckZoom] = useState(1.0)
+  const [deckPanOffset, setDeckPanOffset] = useState({ x: 0, y: 0 })
 
   useEffect(() => {
     const savedInfo = localStorage.getItem('userInfo')
@@ -591,7 +594,8 @@ export default function Dashboard() {
 
   const menuItems = [
     { id: 'overview', name: 'Dashboard', icon: HiOutlineHome, description: 'Class summary & quick actions' },
-    { id: 'flight-deck', name: 'Live Flight Deck', icon: HiOutlineStatusOnline, description: 'Live whiteboard & student response split-screen' },
+    { id: 'flight-deck', name: 'Live Flight Deck', icon: HiOutlineStatusOnline, description: 'Live student response & monitoring panel' },
+    { id: 'whiteboard', name: 'Interactive Whiteboard', icon: HiOutlinePencil, description: 'Draw, present, and sync live canvas' },
     { id: 'planner', name: 'Lesson Planner', icon: HiOutlineCalendar, description: 'Create comprehensive lesson plans in seconds' },
     { id: 'digitizer', name: 'Paper Digitizer', icon: HiOutlineDocumentText, description: 'Digitize handwritten exams & assignments' },
     { id: 'visual-aids', name: 'Visual Aids', icon: HiOutlineSparkles, description: 'Create engaging diagrams and charts for your lessons' },
@@ -637,10 +641,27 @@ export default function Dashboard() {
             setDoubts={setDeckDoubts}
             chatMessages={deckChatMessages}
             setChatMessages={setDeckChatMessages}
+            isSharingWhiteboard={deckIsSharingWhiteboard}
+            setIsSharingWhiteboard={setDeckIsSharingWhiteboard}
+          />
+        )
+      case 'whiteboard':
+        return (
+          <InteractiveWhiteboard
+            socketRef={socketRef}
+            isLive={isDeckLive}
+            deckPin={deckPin}
             whiteboardHistory={deckWhiteboardHistory}
             setWhiteboardHistory={setDeckWhiteboardHistory}
             historyIndex={deckHistoryIndex}
             setHistoryIndex={setDeckHistoryIndex}
+            isSharingWhiteboard={deckIsSharingWhiteboard}
+            setIsSharingWhiteboard={setDeckIsSharingWhiteboard}
+            zoom={deckZoom}
+            setZoom={setDeckZoom}
+            panOffset={deckPanOffset}
+            setPanOffset={setDeckPanOffset}
+            setActiveTab={setActiveTab}
           />
         )
       case 'math-helper':
@@ -1404,38 +1425,11 @@ function LiveFlightDeck({
   setDoubts,
   chatMessages,
   setChatMessages,
-  whiteboardHistory,
-  setWhiteboardHistory,
-  historyIndex,
-  setHistoryIndex
+  isSharingWhiteboard,
+  setIsSharingWhiteboard
 }) {
   const [chatInput, setChatInput] = useState('');
   
-  // Whiteboard States (UI/Drawing Configuration remain local/transient)
-  const [tool, setTool] = useState('pencil'); // 'pencil' | 'line' | 'rect' | 'circle' | 'eraser' | 'text'
-  const [brushColor, setBrushColor] = useState('#10b981');
-  const [brushWidth, setBrushWidth] = useState(4);
-  
-  // Drawing internal refs & states
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-  const [textInputPos, setTextInputPos] = useState(null);
-  const [textInputValue, setTextInputValue] = useState('');
-  
-  const canvasRef = useRef(null);
-  const currentStrokeRef = useRef(null);
-  
-  // Selection and Drag-Move engine states
-  const [selectedElementIdx, setSelectedElementIdx] = useState(-1);
-  const draggedOriginalElementRef = useRef(null);
-  
-  // Excalidraw-like config states
-  const [fillColor, setFillColor] = useState('transparent');
-  const [opacity, setOpacity] = useState(100);
-  const [fontFamily, setFontFamily] = useState('sans-serif');
-  const [fontSize, setFontSize] = useState(4);
-  const [textAlign, setTextAlign] = useState('left');
-
   // Auto scroll chat
   const chatEndRef = useRef(null);
   useEffect(() => {
@@ -1444,44 +1438,363 @@ function LiveFlightDeck({
     }
   }, [chatMessages]);
 
-  // Redraw canvas on history changes or resize
-  useEffect(() => {
-    if (isLive && canvasRef.current) {
-      redrawCanvas();
+  const handleToggleShare = (forceState = null) => {
+    const nextSharing = forceState !== null ? forceState : !isSharingWhiteboard;
+    setIsSharingWhiteboard(nextSharing);
+    if (socketRef.current) {
+      socketRef.current.emit('teacher:toggle_share_whiteboard', { isSharing: nextSharing });
     }
-  }, [whiteboardHistory, historyIndex, isLive]);
+  };
 
   const handleStartDeck = () => {
     const pin = initialDeckUid || Math.floor(100000 + Math.random() * 900000).toString();
     setDeckPin(pin);
     setIsLive(true);
+    setIsSharingWhiteboard(false);
     if (socketRef.current) {
       socketRef.current.emit('teacher:start_deck', { deckUid: pin });
     }
   };
 
-  const redrawCanvas = () => {
+  const handleSendChat = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    const msg = {
+      sender: 'Professor',
+      text: chatInput,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    if (socketRef.current) {
+      socketRef.current.emit('deck:chat_message', { deckUid: deckPin, message: msg });
+    }
+    setChatInput('');
+  };
+
+  const handleResolveDoubt = (doubtId) => {
+    if (socketRef.current) {
+      socketRef.current.emit('deck:resolve_doubt', { deckUid: deckPin, doubtId });
+    }
+  };
+
+  const renderJoinedStudents = (fullHeight = false) => (
+    <div className={`border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-0 ${fullHeight ? 'flex-1' : 'h-[190px] shrink-0'}`}>
+      <div className="flex justify-between items-center pb-2.5 border-b border-white/[0.06] shrink-0">
+        <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space flex items-center gap-2">
+          <span>Joined Students</span>
+          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono text-[10px]">{joinedStudents.length}</span>
+        </h4>
+      </div>
+      
+      <div className="mt-3 overflow-y-auto flex-1 pr-1 space-y-2 custom-sidebar-scroll">
+        {joinedStudents.length === 0 ? (
+          <div className="text-center py-4">
+            <p className="text-[10px] text-gray-500 italic">Waiting for students to join using PIN...</p>
+          </div>
+        ) : (
+          joinedStudents.map((student, idx) => (
+            <div key={idx} className="bg-white/[0.02] border border-white/[0.04] p-2 rounded-xl flex items-center justify-between transition-colors hover:bg-white/[0.04]">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-[10px] text-emerald-400 font-extrabold font-space">
+                  {student.name.split(' ').map(n => n[0]).join('')}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-white truncate leading-none">{student.name}</p>
+                  <p className="text-[9px] text-gray-500 truncate mt-1">{student.uid || student.email}</p>
+                </div>
+              </div>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  const renderDoubtInbox = (fullHeight = false) => (
+    <div className="border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-0 flex-1">
+      <div className="flex justify-between items-center pb-2.5 border-b border-white/[0.06] shrink-0">
+        <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space flex items-center gap-2">
+          <span>Doubt Inbox</span>
+          {doubts.length > 0 && (
+            <span className="bg-rose-500/15 text-rose-400 border border-rose-500/30 px-1.5 py-0.2 rounded font-mono text-[10px] animate-pulse">{doubts.length}</span>
+          )}
+        </h4>
+      </div>
+
+      <div className="mt-3 overflow-y-auto flex-1 pr-1 space-y-2.5 custom-sidebar-scroll">
+        {doubts.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center py-6">
+            <svg className="w-8 h-8 text-[#262d29] mb-1.5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+            <p className="text-[10px] text-gray-500 font-semibold">No doubts raised yet.</p>
+          </div>
+        ) : (
+          doubts.map((doubt) => (
+            <div key={doubt.id} className="p-3 bg-rose-500/5 border border-rose-500/20 text-rose-300 rounded-xl text-xs space-y-2 flex flex-col animate-fadeIn">
+              <div className="flex justify-between items-center border-b border-white/[0.04] pb-1.5 shrink-0">
+                <span className="font-extrabold text-white">{doubt.studentName}</span>
+                <button
+                  onClick={() => handleResolveDoubt(doubt.id)}
+                  className="px-2 py-0.5 bg-rose-500/15 border border-rose-500/35 hover:bg-rose-500/25 rounded text-[9px] text-rose-400 font-bold transition-all cursor-pointer"
+                >
+                  Resolve
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-300 leading-normal italic font-semibold select-text">
+                "${doubt.text}"
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  const renderRoomChat = (fullHeight = false) => (
+    <div className={`border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-0 ${fullHeight ? 'flex-1' : 'h-[250px] shrink-0'}`}>
+      <div className="flex items-center justify-between pb-2 border-b border-white/[0.06] shrink-0">
+        <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space">Synced Room Chat</h4>
+      </div>
+
+      <div className="flex-1 overflow-y-auto space-y-2.5 my-3 pr-1 text-[11px] custom-sidebar-scroll">
+        {chatMessages.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-gray-500 text-[10px] italic">
+            Class chatroom is empty. Say hello!
+          </div>
+        ) : (
+          chatMessages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`flex flex-col max-w-[85%] rounded-xl px-3 py-2 border ${
+                msg.sender === 'Professor'
+                  ? 'bg-emerald-500/10 border-emerald-500/25 text-white ml-auto text-right'
+                  : 'bg-white/[0.04] border-white/[0.08] text-gray-200 mr-auto text-left'
+              }`}
+            >
+              <span className="text-[8px] font-bold text-gray-500">{msg.sender} • {msg.timestamp}</span>
+              <p className="mt-0.5 font-semibold leading-relaxed select-text">{msg.text}</p>
+            </div>
+          ))
+        )}
+        <div ref={chatEndRef} />
+      </div>
+
+      <form onSubmit={handleSendChat} className="flex gap-2 shrink-0">
+        <input
+          type="text"
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          placeholder="Broadcast announcement to classroom..."
+          className="flex-1 bg-black/60 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 font-semibold"
+        />
+        <button
+          type="submit"
+          className="px-4 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl font-bold flex items-center justify-center transition-colors cursor-pointer"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+        </button>
+      </form>
+    </div>
+  );
+
+  if (!isLive) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 border border-white/[0.08] bg-[#070b09]/40 backdrop-blur-xl rounded-3xl text-center space-y-6 max-w-2xl mx-auto my-12 relative overflow-hidden shadow-[0_20px_50px_rgba(16,185,129,0.05)]">
+        <div className="absolute top-[-200px] left-[-200px] w-[500px] h-[500px] rounded-full bg-emerald-500/[0.02] blur-[100px] pointer-events-none" />
+        <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.15)] relative z-10 animate-pulse">
+          <HiOutlineStatusOnline size={40} />
+        </div>
+        <div className="space-y-2.5 relative z-10">
+          <h2 className="text-2xl sm:text-3xl font-black text-white font-space tracking-tight">Interactive Flight Deck</h2>
+          <p className="text-sm text-gray-400 leading-relaxed max-w-md mx-auto font-semibold">
+            Start a live whiteboard class session. Draw structures, explain concepts, chat in real-time, and solve student doubts instantly.
+          </p>
+        </div>
+        <button
+          onClick={handleStartDeck}
+          className="py-3.5 px-8 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-emerald-400 hover:to-green-300 text-black text-xs sm:text-sm font-black uppercase tracking-wider rounded-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer shadow-[0_4px_20px_rgba(16,185,129,0.3)] relative z-10"
+        >
+          Start Live Flight Deck
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col space-y-4 w-full h-[calc(100vh-120px)]"
+    >
+      {/* Dynamic Session Controls Header */}
+      <div className="border border-white/[0.08] bg-[#070b09]/90 p-4 rounded-2xl shadow-lg flex flex-wrap items-center justify-between gap-4 shrink-0">
+        <div className="flex items-center gap-3">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
+          <div>
+            <span className="text-sm font-black uppercase text-emerald-400 tracking-wider font-space">Live Flight Deck Session</span>
+            {deckPin && <p className="text-[10px] text-gray-400 font-semibold mt-0.5">PIN: {deckPin} | Connected Students: {joinedStudents.length}</p>}
+          </div>
+        </div>
+        
+        {/* Buttons to share whiteboard / stop share / go to whiteboard */}
+        <div className="flex items-center gap-3">
+          {/* Share Whiteboard */}
+          <button
+            onClick={() => handleToggleShare(true)}
+            disabled={isSharingWhiteboard}
+            className={`py-2 px-5 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 transform active:scale-95 cursor-pointer flex items-center gap-2 shadow-md ${
+              isSharingWhiteboard
+                ? 'bg-emerald-500/10 text-emerald-500/30 border border-white/[0.05] cursor-not-allowed opacity-40'
+                : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_15px_rgba(16,185,129,0.25)] border border-emerald-500/20'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 10.742h.008v.008h-.008v-.008zM12 8.25a.75.75 0 100-1.5.75 0 000 1.5zm0 0v-3.75m0 3.75a3.75 3.75 0 110 7.5 3.75 3.75 0 010-7.5zm0 7.5v3.75M12 12h.008v.008H12V12z" /></svg>
+            <span>Share Whiteboard</span>
+          </button>
+
+          {/* Stop Sharing */}
+          <button
+            onClick={() => handleToggleShare(false)}
+            disabled={!isSharingWhiteboard}
+            className={`py-2 px-5 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 transform active:scale-95 cursor-pointer flex items-center gap-2 shadow-md ${
+              !isSharingWhiteboard
+                ? 'bg-rose-500/10 text-rose-500/30 border border-white/[0.05] cursor-not-allowed opacity-40'
+                : 'bg-rose-500 hover:bg-rose-400 text-white shadow-[0_0_15px_rgba(239,68,68,0.25)] border border-rose-500/25'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M18.36 18.36a9 9 0 01-12.728 0M12 2v10m0 0l-3-3m3 3l3-3" /></svg>
+            <span>Stop Sharing</span>
+          </button>
+
+          <div className="w-px h-6 bg-white/[0.08] mx-1" />
+
+          {/* Open Canvas Tab */}
+          <button
+            onClick={() => setActiveTab('whiteboard')}
+            className="py-2 px-5 bg-gradient-to-r from-teal-500/20 to-emerald-500/10 hover:from-teal-500/35 hover:to-emerald-500/20 border border-teal-500/40 text-teal-300 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 transform active:scale-95 cursor-pointer flex items-center gap-1.5 shadow-md shadow-teal-500/10"
+          >
+            <HiOutlinePencil size={14} />
+            <span>Go to Whiteboard</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Grid Workspace - Always show student panels in 3-column layout */}
+      <div className="flex-1 min-h-0">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch h-full min-h-0">
+          {renderJoinedStudents(true)}
+          {renderDoubtInbox(true)}
+          {renderRoomChat(true)}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function InteractiveWhiteboard({
+  socketRef,
+  isLive,
+  deckPin,
+  whiteboardHistory,
+  setWhiteboardHistory,
+  historyIndex,
+  setHistoryIndex,
+  isSharingWhiteboard,
+  setIsSharingWhiteboard,
+  zoom,
+  setZoom,
+  panOffset,
+  setPanOffset,
+  setActiveTab
+}) {
+  const [tool, setTool] = useState('pencil'); // 'pencil' | 'line' | 'rect' | 'circle' | 'eraser' | 'text' | 'select' | 'hand' | 'arrow' | 'diamond'
+  const [brushColor, setBrushColor] = useState('#10b981');
+  const [brushWidth, setBrushWidth] = useState(4);
+  const [fillColor, setFillColor] = useState('transparent');
+  const [opacity, setOpacity] = useState(100);
+  const [fontFamily, setFontFamily] = useState('sans-serif');
+  const [fontSize, setFontSize] = useState(4);
+  const [textAlign, setTextAlign] = useState('left');
+
+  // Drawing states
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const [textInputPos, setTextInputPos] = useState(null);
+  const [textInputValue, setTextInputValue] = useState('');
+
+  const canvasRef = useRef(null);
+  const currentStrokeRef = useRef(null);
+
+  // Selection states
+  const [selectedElementIdx, setSelectedElementIdx] = useState(-1);
+  const draggedOriginalElementRef = useRef(null);
+
+  // Redraw canvas on history, visibility, zoom, or pan changes
+  useEffect(() => {
+    redrawCanvas();
+  }, [whiteboardHistory, historyIndex, zoom, panOffset]);
+
+  // Sync zoom and pan wheel event listener
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const handleCanvasWheel = (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.05 : 0.95;
+      const newZoom = Math.min(Math.max(zoom * zoomFactor, 0.15), 8.0);
+      
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      const nextPanOffset = {
+        x: mouseX - (mouseX - panOffset.x) * (newZoom / zoom),
+        y: mouseY - (mouseY - panOffset.y) * (newZoom / zoom)
+      };
+      
+      setZoom(newZoom);
+      setPanOffset(nextPanOffset);
+      
+      if (isLive && socketRef.current) {
+        socketRef.current.emit('teacher:sync_zoom_pan', { zoom: newZoom, panOffset: nextPanOffset });
+      }
+    };
+    canvas.addEventListener('wheel', handleCanvasWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', handleCanvasWheel);
+    };
+  }, [zoom, panOffset, isLive]);
 
-    // Draw grid background
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.04)';
-    ctx.lineWidth = 1;
-    const gridStep = 25;
-    for (let x = 0; x < canvas.width; x += gridStep) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-    }
-    for (let y = 0; y < canvas.height; y += gridStep) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-    }
+  // Handle canvas size initialization and resize events
+  useEffect(() => {
+    const handleResize = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const container = canvas.parentElement;
+      if (!container) return;
+      canvas.width = container.clientWidth;
+      canvas.height = Math.max(container.clientHeight, 550);
+      redrawCanvas();
+    };
 
-    // Draw active history
-    const activeHistory = whiteboardHistory.slice(0, historyIndex);
-    activeHistory.forEach(action => {
-      drawActionScaled(ctx, action, canvas.width, canvas.height);
-    });
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleToggleShare = () => {
+    const nextSharing = !isSharingWhiteboard;
+    setIsSharingWhiteboard(nextSharing);
+    if (socketRef.current) {
+      socketRef.current.emit('teacher:toggle_share_whiteboard', { isSharing: nextSharing });
+    }
+  };
+
+  const handleZoomPanChange = (newZoom, newPanOffset) => {
+    setZoom(newZoom);
+    setPanOffset(newPanOffset);
+    if (isLive && socketRef.current) {
+      socketRef.current.emit('teacher:sync_zoom_pan', { zoom: newZoom, panOffset: newPanOffset });
+    }
   };
 
   const drawActionScaled = (ctx, action, targetWidth, targetHeight) => {
@@ -1491,7 +1804,6 @@ function LiveFlightDeck({
     const scaleX = targetWidth / (action.canvasWidth || 800);
     const scaleY = targetHeight / (action.canvasHeight || 600);
     
-    // Save previous alpha
     const oldAlpha = ctx.globalAlpha;
     if (action.opacity !== undefined) {
       ctx.globalAlpha = action.opacity / 100;
@@ -1569,11 +1881,42 @@ function LiveFlightDeck({
       ctx.font = `${scaledSize * 3 + 12}px ${fontFamily}`;
       ctx.textAlign = action.textAlign || 'left';
       ctx.fillText(action.text, action.x * scaleX, action.y * scaleY);
-      ctx.textAlign = 'left'; // Reset
+      ctx.textAlign = 'left';
     }
     
-    // Restore alpha
     ctx.globalAlpha = oldAlpha;
+  };
+
+  const redrawCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(panOffset.x, panOffset.y);
+    ctx.scale(zoom, zoom);
+
+    // Grid background
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.04)';
+    ctx.lineWidth = 1 / zoom;
+    const gridStep = 25;
+    const halfW = 2000;
+    const halfH = 2000;
+    for (let x = -halfW; x < canvas.width + halfW; x += gridStep) {
+      ctx.beginPath(); ctx.moveTo(x, -halfH); ctx.lineTo(x, canvas.height + halfH); ctx.stroke();
+    }
+    for (let y = -halfH; y < canvas.height + halfH; y += gridStep) {
+      ctx.beginPath(); ctx.moveTo(-halfW, y); ctx.lineTo(canvas.width + halfW, y); ctx.stroke();
+    }
+
+    // Active history
+    const activeHistory = whiteboardHistory.slice(0, historyIndex);
+    activeHistory.forEach(action => {
+      drawActionScaled(ctx, action, canvas.width, canvas.height);
+    });
+
+    ctx.restore();
   };
 
   const isHit = (action, x, y, threshold) => {
@@ -1657,33 +2000,47 @@ function LiveFlightDeck({
     const rect = canvas.getBoundingClientRect();
     const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
     const clientY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+    const physicalX = clientX - rect.left;
+    const physicalY = clientY - rect.top;
+    
+    const scaleX = canvas.width / 800;
+    const scaleY = canvas.height / 600;
+    
     return {
-      x: clientX - rect.left,
-      y: clientY - rect.top
+      x: (physicalX - panOffset.x) / (zoom * scaleX),
+      y: (physicalY - panOffset.y) / (zoom * scaleY)
     };
   };
 
   const handleMouseDown = (e) => {
-    if (textInputPos) return; // Typing text
+    if (textInputPos) return;
     const coords = getCanvasCoords(e);
+    
+    if (tool === 'hand') {
+      setIsDrawing(true);
+      setStartPos({ x: e.clientX, y: e.clientY });
+      draggedOriginalElementRef.current = { ...panOffset };
+      return;
+    }
     
     if (tool === 'text') {
       setTextInputPos(coords);
       setTextInputValue('');
       return;
     }
-
+    
     setIsDrawing(true);
     setStartPos(coords);
+
     const canvas = canvasRef.current;
+    if (!canvas) return;
 
     if (tool === 'select') {
-      const clickProximity = 8;
-      let foundIndex = -1;
+      const threshold = 10;
       const activeHistory = whiteboardHistory.slice(0, historyIndex);
-      // Search from top to bottom (reverse order)
+      let foundIndex = -1;
       for (let i = activeHistory.length - 1; i >= 0; i--) {
-        if (isHit(activeHistory[i], coords.x, coords.y, clickProximity)) {
+        if (isHit(activeHistory[i], coords.x, coords.y, threshold)) {
           foundIndex = i;
           break;
         }
@@ -1709,7 +2066,7 @@ function LiveFlightDeck({
         canvasHeight: canvas.height
       };
       currentStrokeRef.current = newAction;
-      if (socketRef.current) {
+      if (isLive && socketRef.current) {
         socketRef.current.emit('teacher:draw_start', {
           x: coords.x,
           y: coords.y,
@@ -1725,8 +2082,25 @@ function LiveFlightDeck({
 
   const handleMouseMove = (e) => {
     if (!isDrawing) return;
-    const coords = getCanvasCoords(e);
     const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    if (tool === 'hand') {
+      const deltaX = e.clientX - startPos.x;
+      const deltaY = e.clientY - startPos.y;
+      const startPan = draggedOriginalElementRef.current;
+      if (startPan) {
+        const nextPan = { x: startPan.x + deltaX, y: startPan.y + deltaY };
+        setPanOffset(nextPan);
+        if (isLive && socketRef.current) {
+          socketRef.current.emit('teacher:sync_zoom_pan', { zoom, panOffset: nextPan });
+        }
+        redrawCanvas();
+      }
+      return;
+    }
+
+    const coords = getCanvasCoords(e);
     const ctx = canvas.getContext('2d');
 
     if (tool === 'select') {
@@ -1765,9 +2139,12 @@ function LiveFlightDeck({
       return;
     }
 
+    const scaleX = canvas.width / 800;
+    const scaleY = canvas.height / 600;
+
     if (tool === 'pencil' || tool === 'eraser') {
       currentStrokeRef.current.points.push(coords);
-      if (socketRef.current) {
+      if (isLive && socketRef.current) {
         socketRef.current.emit('teacher:draw_move', {
           x: coords.x,
           y: coords.y,
@@ -1775,27 +2152,38 @@ function LiveFlightDeck({
         });
       }
       redrawCanvas();
+      
+      ctx.save();
+      ctx.translate(panOffset.x, panOffset.y);
+      ctx.scale(zoom, zoom);
+      
       ctx.beginPath();
       ctx.strokeStyle = tool === 'eraser' ? '#050907' : brushColor;
-      ctx.lineWidth = brushWidth;
+      ctx.lineWidth = brushWidth * Math.min(scaleX, scaleY);
       const pts = currentStrokeRef.current.points;
-      ctx.moveTo(pts[0].x, pts[0].y);
+      ctx.moveTo(pts[0].x * scaleX, pts[0].y * scaleY);
       for (let i = 1; i < pts.length; i++) {
-        ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.lineTo(pts[i].x * scaleX, pts[i].y * scaleY);
       }
       ctx.stroke();
+      ctx.restore();
     } else {
       redrawCanvas();
+      
+      ctx.save();
+      ctx.translate(panOffset.x, panOffset.y);
+      ctx.scale(zoom, zoom);
+      
       ctx.strokeStyle = brushColor;
-      ctx.lineWidth = brushWidth;
+      ctx.lineWidth = brushWidth * Math.min(scaleX, scaleY);
       ctx.fillStyle = fillColor;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       
-      const x1 = startPos.x;
-      const y1 = startPos.y;
-      const x2 = coords.x;
-      const y2 = coords.y;
+      const x1 = startPos.x * scaleX;
+      const y1 = startPos.y * scaleY;
+      const x2 = coords.x * scaleX;
+      const y2 = coords.y * scaleY;
       
       if (tool === 'line') {
         ctx.beginPath();
@@ -1833,7 +2221,7 @@ function LiveFlightDeck({
         ctx.stroke();
         
         const angle = Math.atan2(y2 - y1, x2 - x1);
-        const arrowLength = 12;
+        const arrowLength = 12 * Math.min(scaleX, scaleY);
         ctx.beginPath();
         ctx.moveTo(x2, y2);
         ctx.lineTo(x2 - arrowLength * Math.cos(angle - Math.PI / 6), y2 - arrowLength * Math.sin(angle - Math.PI / 6));
@@ -1842,6 +2230,7 @@ function LiveFlightDeck({
         ctx.fillStyle = brushColor;
         ctx.fill();
       }
+      ctx.restore();
     }
   };
 
@@ -1849,10 +2238,15 @@ function LiveFlightDeck({
     if (!isDrawing) return;
     setIsDrawing(false);
     
+    if (tool === 'hand') {
+      draggedOriginalElementRef.current = null;
+      return;
+    }
+    
     if (tool === 'select') {
       setSelectedElementIdx(-1);
       draggedOriginalElementRef.current = null;
-      if (socketRef.current) {
+      if (isLive && socketRef.current) {
         socketRef.current.emit('teacher:sync_history', whiteboardHistory);
       }
       return;
@@ -1887,7 +2281,7 @@ function LiveFlightDeck({
       setWhiteboardHistory(newHistory);
       setHistoryIndex(newHistory.length);
       
-      if (socketRef.current) {
+      if (isLive && socketRef.current) {
         socketRef.current.emit('teacher:draw_end', { action: finalAction });
       }
     }
@@ -1919,7 +2313,7 @@ function LiveFlightDeck({
     setWhiteboardHistory(newHistory);
     setHistoryIndex(newHistory.length);
     
-    if (socketRef.current) {
+    if (isLive && socketRef.current) {
       socketRef.current.emit('teacher:draw_end', { action: finalAction });
     }
     
@@ -1931,7 +2325,7 @@ function LiveFlightDeck({
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
       setHistoryIndex(newIndex);
-      if (socketRef.current) {
+      if (isLive && socketRef.current) {
         socketRef.current.emit('teacher:sync_history', whiteboardHistory.slice(0, newIndex));
       }
     }
@@ -1941,7 +2335,7 @@ function LiveFlightDeck({
     if (historyIndex < whiteboardHistory.length) {
       const newIndex = historyIndex + 1;
       setHistoryIndex(newIndex);
-      if (socketRef.current) {
+      if (isLive && socketRef.current) {
         socketRef.current.emit('teacher:sync_history', whiteboardHistory.slice(0, newIndex));
       }
     }
@@ -1950,469 +2344,363 @@ function LiveFlightDeck({
   const handleClearBoard = () => {
     setWhiteboardHistory([]);
     setHistoryIndex(0);
-    if (socketRef.current) {
+    if (isLive && socketRef.current) {
       socketRef.current.emit('teacher:clear_canvas');
     }
   };
-
-  const handleSendChat = (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    const msg = {
-      sender: 'Professor',
-      text: chatInput,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    if (socketRef.current) {
-      socketRef.current.emit('deck:chat_message', { deckUid: deckPin, message: msg });
-    }
-    setChatInput('');
-  };
-
-  const handleResolveDoubt = (doubtId) => {
-    if (socketRef.current) {
-      socketRef.current.emit('deck:resolve_doubt', { deckUid: deckPin, doubtId });
-    }
-  };
-
-  useEffect(() => {
-    if (isLive && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const container = canvas.parentElement;
-      canvas.width = container.clientWidth;
-      canvas.height = Math.max(container.clientHeight, 450);
-      redrawCanvas();
-    }
-  }, [isLive]);
-
-  if (!isLive) {
-    return (
-      <div className="flex flex-col items-center justify-center p-12 border border-white/[0.08] bg-[#070b09]/40 backdrop-blur-xl rounded-3xl text-center space-y-6 max-w-2xl mx-auto my-12 relative overflow-hidden shadow-[0_20px_50px_rgba(16,185,129,0.05)]">
-        <div className="absolute top-[-200px] left-[-200px] w-[500px] h-[500px] rounded-full bg-emerald-500/[0.02] blur-[100px] pointer-events-none" />
-        <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.15)] relative z-10 animate-pulse">
-          <HiOutlineStatusOnline size={40} />
-        </div>
-        <div className="space-y-2.5 relative z-10">
-          <h2 className="text-2xl sm:text-3xl font-black text-white font-space tracking-tight">Interactive Flight Deck</h2>
-          <p className="text-sm text-gray-400 leading-relaxed max-w-md mx-auto font-semibold">
-            Start a live whiteboard class session. Draw structures, explain concepts, chat in real-time, and solve student doubts instantly.
-          </p>
-        </div>
-        <button
-          onClick={handleStartDeck}
-          className="py-3.5 px-8 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-emerald-400 hover:to-green-300 text-black text-xs sm:text-sm font-black uppercase tracking-wider rounded-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer shadow-[0_4px_20px_rgba(16,185,129,0.3)] relative z-10"
-        >
-          Start Live Flight Deck
-        </button>
-      </div>
-    );
-  }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col space-y-6 w-full h-[calc(100vh-120px)]"
+      className="flex flex-col space-y-4 w-full h-[calc(100vh-120px)] animate-fadeIn"
     >
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1 min-h-0">
-        
-        {/* LEFT COLUMN: Synced Interactive Whiteboard (8 Columns) */}
-        <div className="lg:col-span-8 flex flex-col min-h-0 relative">
-          <div className="border border-white/[0.08] bg-[#050907]/95 rounded-2xl flex-1 relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] flex flex-col min-h-0">
-            {/* 1. Centered Floating Toolbar Overlay */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-black/85 border border-white/[0.08] p-1.5 rounded-xl shadow-2xl backdrop-blur-md">
-              {[
-                { id: 'select', label: 'Selection', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 7.827 5.34-2.508 1.157-1.378 1.16-.39 4.21Z" /></svg> },
-                { id: 'pencil', label: 'Pencil (Freehand)', icon: <HiOutlinePencil size={16} /> },
-                { id: 'line', label: 'Line', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="19" x2="19" y2="5" /></svg> },
-                { id: 'arrow', label: 'Arrow', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25 21 12m0 0-3.75 3.75M21 12H3" /></svg> },
-                { id: 'rect', label: 'Rectangle', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="1" /></svg> },
-                { id: 'diamond', label: 'Diamond', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3L21 12L12 21L3 12Z" /></svg> },
-                { id: 'circle', label: 'Circle', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" /></svg> },
-                { id: 'text', label: 'Text', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 7V4H20V7M12 4V20M9 20H15" /></svg> },
-                { id: 'eraser', label: 'Eraser', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 20H7L3 16C2 15 2 13 3 12L13 2C14 1 16 1 17 2L21 6C22 7 22 9 21 10L14 17L18 20" /></svg> }
-              ].map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => { setTool(t.id); setTextInputPos(null); }}
-                  title={t.label}
-                  className={`p-2.5 rounded-lg transition-all duration-200 cursor-pointer ${
-                    tool === t.id
-                      ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.3)] font-extrabold scale-105'
-                      : 'text-gray-400 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  {t.icon}
-                </button>
-              ))}
-            </div>
+      {/* Interactive Whiteboard Control Header */}
+      <div className="border border-white/[0.08] bg-[#070b09]/90 p-4 rounded-2xl shadow-lg flex flex-wrap items-center justify-between gap-4 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+            <HiOutlinePencil size={18} />
+          </div>
+          <div>
+            <span className="text-sm font-black uppercase text-emerald-400 tracking-wider font-space">Interactive Whiteboard</span>
+            {isLive ? (
+              <p className="text-[10px] text-gray-400 font-semibold mt-0.5">PIN: {deckPin} | Class Session is Live</p>
+            ) : (
+              <p className="text-[10px] text-gray-500 font-semibold mt-0.5">Offline mode | Local Sandbox</p>
+            )}
+          </div>
+        </div>
 
-            {/* 2. Left Configuration Sidebar Panel Overlay */}
-            {tool !== 'select' && tool !== 'eraser' && (
-              <div className="absolute top-20 left-4 z-20 flex flex-col gap-4 bg-black/85 border border-white/[0.08] p-4 rounded-xl shadow-2xl backdrop-blur-md w-56 text-xs max-h-[75%] overflow-y-auto custom-sidebar-scroll animate-fadeIn">
-                {/* Stroke Color selection */}
+        {/* Live Broadcast / Share controls */}
+        <div className="flex items-center gap-3">
+          {isLive ? (
+            <>
+              {/* Broadcast Status Badge */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/[0.06] bg-black/40 text-[10px] font-bold text-gray-400">
+                {isSharingWhiteboard ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                    <span className="text-emerald-400 uppercase tracking-wide">Sharing Live</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-gray-600" />
+                    <span className="uppercase tracking-wide">Sharing Inactive</span>
+                  </>
+                )}
+              </div>
+
+              {/* Share Toggle Button */}
+              <button
+                onClick={handleToggleShare}
+                className={`py-2 px-5 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 transform active:scale-95 cursor-pointer flex items-center gap-2 shadow-md ${
+                  isSharingWhiteboard
+                    ? 'bg-rose-500 hover:bg-rose-400 text-white shadow-[0_0_15px_rgba(239,68,68,0.25)] border border-rose-500/25'
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_15px_rgba(16,185,129,0.25)] border border-emerald-500/20'
+                }`}
+              >
+                {isSharingWhiteboard ? (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M18.36 18.36a9 9 0 01-12.728 0M12 2v10m0 0l-3-3m3 3l3-3" /></svg>
+                    <span>Stop Sharing</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 10.742h.008v.008h-.008v-.008zM12 8.25a.75.75 0 100-1.5.75 0 000 1.5zm0 0v-3.75m0 3.75a3.75 3.75 0 110 7.5 3.75 3.75 0 010-7.5zm0 7.5v3.75M12 12h.008v.008H12V12z" /></svg>
+                    <span>Share Whiteboard</span>
+                  </>
+                )}
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setActiveTab('flight-deck')}
+              className="py-2 px-5 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-emerald-400 hover:to-green-300 text-black text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 transform active:scale-95 cursor-pointer flex items-center gap-1.5 shadow-md shadow-emerald-500/10"
+            >
+              <HiOutlineStatusOnline size={14} />
+              <span>Start Live Flight Deck</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Drawing Sandbox Workspace */}
+      <div className="flex-1 w-full min-h-0 relative">
+        <div className="border border-white/[0.08] bg-[#050907]/95 rounded-2xl w-full h-full relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] flex flex-col min-h-0">
+          
+          {/* Floating Toolbar Overlay */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-black/85 border border-white/[0.08] p-1.5 rounded-xl shadow-2xl backdrop-blur-md">
+            {[
+              { id: 'select', label: 'Selection', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 7.827 5.34-2.508 1.157-1.378 1.16-.39 4.21Z" /></svg> },
+              { id: 'hand', label: 'Hand (Pan)', icon: <HiOutlineHand size={16} /> },
+              { id: 'pencil', label: 'Pencil (Freehand)', icon: <HiOutlinePencil size={16} /> },
+              { id: 'line', label: 'Line', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="19" x2="19" y2="5" /></svg> },
+              { id: 'arrow', label: 'Arrow', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25 21 12m0 0-3.75 3.75M21 12H3" /></svg> },
+              { id: 'rect', label: 'Rectangle', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="1" /></svg> },
+              { id: 'diamond', label: 'Diamond', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3L21 12L12 21L3 12Z" /></svg> },
+              { id: 'circle', label: 'Circle', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" /></svg> },
+              { id: 'text', label: 'Text', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 7V4H20V7M12 4V20M9 20H15" /></svg> },
+              { id: 'eraser', label: 'Eraser', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 20H7L3 16C2 15 2 13 3 12L13 2C14 1 16 1 17 2L21 6C22 7 22 9 21 10L14 17L18 20" /></svg> }
+            ].map(t => (
+              <button
+                key={t.id}
+                onClick={() => { setTool(t.id); setTextInputPos(null); }}
+                title={t.label}
+                className={`p-2.5 rounded-lg transition-all duration-200 cursor-pointer ${
+                  tool === t.id
+                    ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.3)] font-extrabold scale-105'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {t.icon}
+              </button>
+            ))}
+          </div>
+
+          {/* Configuration Sidebar Panel Overlay */}
+          {tool !== 'select' && tool !== 'eraser' && tool !== 'hand' && (
+            <div className="absolute top-20 left-4 z-20 flex flex-col gap-4 bg-black/85 border border-white/[0.08] p-4 rounded-xl shadow-2xl backdrop-blur-md w-56 text-xs max-h-[75%] overflow-y-auto custom-sidebar-scroll animate-fadeIn">
+              {/* Stroke Color */}
+              <div className="space-y-2">
+                <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Stroke Color</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {['#10b981', '#3b82f6', '#ef4444', '#f59e0b', '#ffffff', '#000000'].map(c => (
+                    <button
+                      key={c}
+                      onClick={() => setBrushColor(c)}
+                      style={{ backgroundColor: c }}
+                      className={`w-5.5 h-5.5 rounded border transition-all duration-150 cursor-pointer ${
+                        brushColor === c ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Fill Color */}
+              {tool !== 'pencil' && tool !== 'text' && (
                 <div className="space-y-2">
-                  <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Stroke Color</span>
+                  <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Background Fill</span>
                   <div className="flex flex-wrap gap-1.5">
-                    {['#10b981', '#3b82f6', '#ef4444', '#f59e0b', '#ffffff', '#000000'].map(c => (
+                    {['transparent', 'rgba(16,185,129,0.15)', 'rgba(59,130,246,0.15)', 'rgba(239,68,68,0.15)', 'rgba(245,158,11,0.15)', 'rgba(255,255,255,0.15)'].map(c => (
                       <button
                         key={c}
-                        onClick={() => setBrushColor(c)}
-                        style={{ backgroundColor: c }}
-                        className={`w-5.5 h-5.5 rounded border transition-all duration-150 cursor-pointer ${
-                          brushColor === c ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'
-                        }`}
-                      />
+                        onClick={() => setFillColor(c)}
+                        style={{ backgroundColor: c === 'transparent' ? 'transparent' : c }}
+                        className={`w-5.5 h-5.5 rounded border transition-all duration-150 cursor-pointer flex items-center justify-center ${
+                          fillColor === c ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'
+                        } ${c === 'transparent' ? 'border-white/[0.2] bg-[linear-gradient(45deg,transparent_45%,#fff_45%,#fff_55%,transparent_55%)]' : ''}`}
+                      >
+                        {c === 'transparent' && <span className="text-[10px] text-gray-500 font-bold">✖</span>}
+                      </button>
                     ))}
                   </div>
                 </div>
+              )}
 
-                {/* Fill Color selection */}
-                {tool !== 'pencil' && tool !== 'text' && (
-                  <div className="space-y-2">
-                    <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Background Fill</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {['transparent', 'rgba(16,185,129,0.15)', 'rgba(59,130,246,0.15)', 'rgba(239,68,68,0.15)', 'rgba(245,158,11,0.15)', 'rgba(255,255,255,0.15)'].map(c => (
+              {/* Stroke Width */}
+              <div className="space-y-2">
+                <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Stroke Width</span>
+                <div className="flex gap-2">
+                  {[
+                    { id: 2, label: 'Thin' },
+                    { id: 4, label: 'Medium' },
+                    { id: 8, label: 'Bold' }
+                  ].map(w => (
+                    <button
+                      key={w.id}
+                      onClick={() => setBrushWidth(w.id)}
+                      className={`flex-1 py-1.5 rounded text-[10px] border font-black transition-all cursor-pointer ${
+                        brushWidth === w.id
+                          ? 'bg-emerald-500 text-black border-emerald-500'
+                          : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      {w.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Opacity */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase">
+                  <span>Opacity</span>
+                  <span className="text-emerald-400 font-mono font-black">{opacity}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  step="10"
+                  value={opacity}
+                  onChange={(e) => setOpacity(parseInt(e.target.value, 10))}
+                  className="w-full accent-emerald-500 cursor-pointer"
+                />
+              </div>
+
+              {/* Text Configurations */}
+              {tool === 'text' && (
+                <div className="space-y-3 pt-2 border-t border-white/[0.08] animate-fadeIn">
+                  <div className="space-y-1.5">
+                    <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Font Family</span>
+                    <div className="flex gap-1.5">
+                      {[
+                        { id: 'sans-serif', label: 'Sans' },
+                        { id: 'mono', label: 'Mono' },
+                        { id: 'handdrawn', label: 'Hand' }
+                      ].map(f => (
                         <button
-                          key={c}
-                          onClick={() => setFillColor(c)}
-                          style={{ backgroundColor: c === 'transparent' ? 'transparent' : c }}
-                          className={`w-5.5 h-5.5 rounded border transition-all duration-150 cursor-pointer flex items-center justify-center ${
-                            fillColor === c ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'
-                          } ${c === 'transparent' ? 'border-white/[0.2] bg-[linear-gradient(45deg,transparent_45%,#fff_45%,#fff_55%,transparent_55%)]' : ''}`}
+                          key={f.id}
+                          onClick={() => setFontFamily(f.id)}
+                          className={`flex-1 py-1 rounded text-[9px] border font-bold transition-all cursor-pointer ${
+                            fontFamily === f.id
+                              ? 'bg-emerald-500 text-black border-emerald-500 font-black'
+                              : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
+                          }`}
                         >
-                          {c === 'transparent' && <span className="text-[10px] text-gray-500 font-bold">✖</span>}
+                          {f.label}
                         </button>
                       ))}
                     </div>
                   </div>
-                )}
 
-                {/* Stroke Width selection */}
-                <div className="space-y-2">
-                  <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Stroke Width</span>
-                  <div className="flex gap-2">
-                    {[
-                      { id: 2, label: 'Thin' },
-                      { id: 4, label: 'Medium' },
-                      { id: 8, label: 'Bold' }
-                    ].map(w => (
-                      <button
-                        key={w.id}
-                        onClick={() => setBrushWidth(w.id)}
-                        className={`flex-1 py-1.5 rounded text-[10px] border font-black transition-all cursor-pointer ${
-                          brushWidth === w.id
-                            ? 'bg-emerald-500 text-black border-emerald-500'
-                            : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
-                        }`}
-                      >
-                        {w.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Opacity selection */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase">
-                    <span>Opacity</span>
-                    <span className="text-emerald-400 font-mono font-black">{opacity}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="10"
-                    max="100"
-                    step="10"
-                    value={opacity}
-                    onChange={(e) => setOpacity(parseInt(e.target.value, 10))}
-                    className="w-full accent-emerald-500 cursor-pointer"
-                  />
-                </div>
-
-                {/* Text Tool Configurations */}
-                {tool === 'text' && (
-                  <div className="space-y-3 pt-2 border-t border-white/[0.08] animate-fadeIn">
-                    <div className="space-y-1.5">
-                      <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Font Family</span>
-                      <div className="flex gap-1.5">
-                        {[
-                          { id: 'sans-serif', label: 'Sans' },
-                          { id: 'mono', label: 'Mono' },
-                          { id: 'handdrawn', label: 'Hand' }
-                        ].map(f => (
-                          <button
-                            key={f.id}
-                            onClick={() => setFontFamily(f.id)}
-                            className={`flex-1 py-1 rounded text-[9px] border font-bold transition-all cursor-pointer ${
-                              fontFamily === f.id
-                                ? 'bg-emerald-500 text-black border-emerald-500 font-black'
-                                : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
-                            }`}
-                          >
-                            {f.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Font Size</span>
-                      <div className="flex gap-1">
-                        {[
-                          { id: 2, label: 'S' },
-                          { id: 4, label: 'M' },
-                          { id: 6, label: 'L' },
-                          { id: 9, label: 'XL' }
-                        ].map(s => (
-                          <button
-                            key={s.id}
-                            onClick={() => setFontSize(s.id)}
-                            className={`w-7 h-7 rounded border font-black text-[10px] flex items-center justify-center transition-all cursor-pointer ${
-                              fontSize === s.id
-                                ? 'bg-emerald-500 text-black border-emerald-500'
-                                : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
-                            }`}
-                          >
-                            {s.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Alignment</span>
-                      <div className="flex gap-1.5">
-                        {[
-                          { id: 'left', label: 'Left', icon: '⫷' },
-                          { id: 'center', label: 'Center', icon: '⫸' },
-                          { id: 'right', label: 'Right', icon: '⫵' }
-                        ].map(a => (
-                          <button
-                            key={a.id}
-                            onClick={() => setTextAlign(a.id)}
-                            className={`flex-1 py-1 rounded text-[9px] border font-bold transition-all cursor-pointer ${
-                              textAlign === a.id
-                                ? 'bg-emerald-500 text-black border-emerald-500 font-black'
-                                : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white'
-                            }`}
-                            title={a.label}
-                          >
-                            {a.icon}
-                          </button>
-                        ))}
-                      </div>
+                  <div className="space-y-1.5">
+                    <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Font Size</span>
+                    <div className="flex gap-1">
+                      {[
+                        { id: 2, label: 'S' },
+                        { id: 4, label: 'M' },
+                        { id: 6, label: 'L' },
+                        { id: 9, label: 'XL' }
+                      ].map(s => (
+                        <button
+                          key={s.id}
+                          onClick={() => setFontSize(s.id)}
+                          className={`w-7 h-7 rounded border font-black text-[10px] flex items-center justify-center transition-all cursor-pointer ${
+                            fontSize === s.id
+                              ? 'bg-emerald-500 text-black border-emerald-500'
+                              : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                )}
-              </div>
-            )}
 
-            {/* 3. Main Drawing Interactive Canvas */}
-            <div className="flex-1 w-full h-full relative cursor-crosshair overflow-hidden select-none">
-              <canvas
-                ref={canvasRef}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onTouchStart={handleMouseDown}
-                onTouchMove={handleMouseMove}
-                onTouchEnd={handleMouseUp}
-                className="absolute inset-0 block w-full h-full"
-              />
-              
-              <div className="absolute bottom-4 left-4 pointer-events-none bg-black/50 border border-white/[0.06] backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] text-gray-400 font-semibold flex items-center gap-1.5 shadow-md">
-                <HiOutlinePencil className="text-emerald-400" size={12} />
-                <span>{tool === 'text' ? 'Click canvas to type text' : tool === 'select' ? 'Click and drag items to move' : `Drawing with ${tool}`}</span>
-              </div>
-
-              {textInputPos && (
-                <div
-                  className="absolute z-30 flex items-center bg-black/80 p-2 rounded-xl border border-emerald-500/30 shadow-2xl"
-                  style={{ top: textInputPos.y - 15, left: textInputPos.x - 10 }}
-                >
-                  <input
-                    type="text"
-                    value={textInputValue}
-                    onChange={(e) => setTextInputValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleTextCommit();
-                      if (e.key === 'Escape') setTextInputPos(null);
-                    }}
-                    placeholder="Type and press Enter..."
-                    className="bg-transparent text-white text-xs outline-none border-none px-1 py-0.5 w-44 font-sans focus:ring-0"
-                    autoFocus
-                    onBlur={handleTextCommit}
-                  />
-                  <button
-                    onClick={handleTextCommit}
-                    className="ml-1 px-2 py-0.5 bg-emerald-500 text-black font-bold text-[10px] rounded"
-                  >
-                    OK
-                  </button>
+                  <div className="space-y-1.5">
+                    <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Alignment</span>
+                    <div className="flex gap-1.5">
+                      {[
+                        { id: 'left', label: 'Left', icon: '⫷' },
+                        { id: 'center', label: 'Center', icon: '⫸' },
+                        { id: 'right', label: 'Right', icon: '⫵' }
+                      ].map(a => (
+                        <button
+                          key={a.id}
+                          onClick={() => setTextAlign(a.id)}
+                          className={`flex-1 py-1 rounded text-[9px] border font-bold transition-all cursor-pointer ${
+                            textAlign === a.id
+                              ? 'bg-emerald-500 text-black border-emerald-500 font-black'
+                              : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white'
+                          }`}
+                          title={a.label}
+                        >
+                          {a.icon}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
-
-              {/* 4. Bottom Right floating zoom controls and clear button */}
-              <div className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 bg-black/85 border border-white/[0.08] p-1.5 rounded-xl shadow-2xl backdrop-blur-md">
-                <button
-                  onClick={handleUndo}
-                  disabled={historyIndex <= 0}
-                  className="p-2 bg-black/40 border border-white/[0.06] rounded-lg text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5 transition-colors cursor-pointer"
-                  title="Undo"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
-                </button>
-                <button
-                  onClick={handleRedo}
-                  disabled={historyIndex >= whiteboardHistory.length}
-                  className="p-2 bg-black/40 border border-white/[0.06] rounded-lg text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5 transition-colors cursor-pointer"
-                  title="Redo"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" /></svg>
-                </button>
-                <div className="w-px h-5 bg-white/[0.08] mx-0.5" />
-                <button
-                  onClick={handleClearBoard}
-                  className="p-2 bg-red-950/15 border border-red-500/20 hover:border-red-500/40 hover:bg-red-950/35 text-red-400 rounded-lg transition-all duration-200 cursor-pointer"
-                  title="Clear whiteboard"
-                >
-                  <HiOutlineTrash size={14} />
-                </button>
-              </div>
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* RIGHT COLUMN: Sidebar (Joined Students, Doubts, Chat) (4 Columns) */}
-        <div className="lg:col-span-4 flex flex-col space-y-4 min-h-0 max-h-full">
-          <div className="border border-white/[0.08] bg-[#070b09]/90 p-4 rounded-2xl shadow-lg shrink-0 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
-              <span className="text-xs font-black uppercase text-emerald-400 tracking-wider font-space">Live Flight Deck</span>
-            </div>
-            {deckPin && (
-              <div className="px-3.5 py-1.5 rounded-xl text-xs font-black font-space border bg-[#061810] text-emerald-400 border-emerald-500/30 flex items-center gap-2 shadow-md">
-                <HiOutlineKey className="text-emerald-500" />
-                <span>PIN: {deckPin}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-0 shrink-0">
-            <div className="flex justify-between items-center pb-2.5 border-b border-white/[0.06]">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space flex items-center gap-2">
-                <span>Joined Students</span>
-                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono text-[10px]">{joinedStudents.length}</span>
-              </h4>
-            </div>
+          {/* Interactive Canvas */}
+          <div className="flex-1 w-full h-full relative cursor-crosshair overflow-hidden select-none">
+            <canvas
+              ref={canvasRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onTouchStart={handleMouseDown}
+              onTouchMove={handleMouseMove}
+              onTouchEnd={handleMouseUp}
+              className="absolute inset-0 block w-full h-full"
+            />
             
-            <div className="mt-3 overflow-y-auto max-h-[140px] pr-1 space-y-2 custom-sidebar-scroll">
-              {joinedStudents.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-[10px] text-gray-500 italic">Waiting for students to join using PIN...</p>
-                </div>
-              ) : (
-                joinedStudents.map((student, idx) => (
-                  <div key={idx} className="bg-white/[0.02] border border-white/[0.04] p-2 rounded-xl flex items-center justify-between transition-colors hover:bg-white/[0.04]">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-[10px] text-emerald-400 font-extrabold font-space">
-                        {student.name.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-white truncate leading-none">{student.name}</p>
-                        <p className="text-[9px] text-gray-500 truncate mt-1">{student.uid || student.email}</p>
-                      </div>
-                    </div>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-0 flex-1">
-            <div className="flex justify-between items-center pb-2.5 border-b border-white/[0.06] shrink-0">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space flex items-center gap-2">
-                <span>Doubt Inbox</span>
-                {doubts.length > 0 && (
-                  <span className="bg-rose-500/15 text-rose-400 border border-rose-500/30 px-1.5 py-0.2 rounded font-mono text-[10px] animate-pulse">{doubts.length}</span>
-                )}
-              </h4>
+            <div className="absolute bottom-4 left-4 pointer-events-none bg-black/50 border border-white/[0.06] backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] text-gray-400 font-semibold flex items-center gap-1.5 shadow-md">
+              <HiOutlinePencil className="text-emerald-400" size={12} />
+              <span>{tool === 'text' ? 'Click canvas to type text' : tool === 'select' ? 'Click and drag items to move' : tool === 'hand' ? 'Drag canvas to pan | Use scroll wheel to zoom' : `Drawing with ${tool}`}</span>
             </div>
 
-            <div className="mt-3 overflow-y-auto flex-1 pr-1 space-y-2.5 custom-sidebar-scroll">
-              {doubts.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center py-6">
-                  <svg className="w-8 h-8 text-[#262d29] mb-1.5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
-                  <p className="text-[10px] text-gray-500 font-semibold">No doubts raised yet.</p>
-                </div>
-              ) : (
-                doubts.map((doubt) => (
-                  <div key={doubt.id} className="p-3 bg-rose-500/5 border border-rose-500/20 text-rose-300 rounded-xl text-xs space-y-2 flex flex-col animate-fadeIn">
-                    <div className="flex justify-between items-center border-b border-white/[0.04] pb-1.5 shrink-0">
-                      <span className="font-extrabold text-white">{doubt.studentName}</span>
-                      <button
-                        onClick={() => handleResolveDoubt(doubt.id)}
-                        className="px-2 py-0.5 bg-rose-500/15 border border-rose-500/35 hover:bg-rose-500/25 rounded text-[9px] text-rose-400 font-bold transition-all cursor-pointer"
-                      >
-                        Resolve
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-gray-300 leading-normal italic font-semibold select-text">
-                      "{doubt.text}"
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-[220px] max-h-[300px] shrink-0">
-            <div className="flex items-center justify-between pb-2 border-b border-white/[0.06] shrink-0">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space">Synced Room Chat</h4>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-2.5 my-3 pr-1 text-[11px] custom-sidebar-scroll">
-              {chatMessages.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-gray-500 text-[10px] italic">
-                  Class chatroom is empty. Say hello!
-                </div>
-              ) : (
-                chatMessages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex flex-col max-w-[85%] rounded-xl px-3 py-2 border ${
-                      msg.sender === 'Professor'
-                        ? 'bg-emerald-500/10 border-emerald-500/25 text-white ml-auto text-right'
-                        : 'bg-white/[0.04] border-white/[0.08] text-gray-200 mr-auto text-left'
-                    }`}
-                  >
-                    <span className="text-[8px] font-bold text-gray-500">{msg.sender} • {msg.timestamp}</span>
-                    <p className="mt-0.5 font-semibold leading-relaxed select-text">{msg.text}</p>
-                  </div>
-                ))
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            <form onSubmit={handleSendChat} className="flex gap-2 shrink-0">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Message classroom..."
-                className="flex-1 bg-black/60 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
-              />
-              <button
-                type="submit"
-                className="px-3 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl font-bold flex items-center justify-center transition-colors cursor-pointer"
+            {textInputPos && (
+              <div
+                className="absolute z-30 flex items-center bg-black/80 p-2 rounded-xl border border-emerald-500/30 shadow-2xl"
+                style={{ top: textInputPos.y - 15, left: textInputPos.x - 10 }}
               >
-                <HiOutlineChat size={14} />
-              </button>
-            </form>
-          </div>
+                <input
+                  type="text"
+                  value={textInputValue}
+                  onChange={(e) => setTextInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleTextCommit();
+                    if (e.key === 'Escape') setTextInputPos(null);
+                  }}
+                  placeholder="Type and press Enter..."
+                  className="bg-transparent text-white text-xs outline-none border-none px-1 py-0.5 w-44 font-sans focus:ring-0"
+                  autoFocus
+                  onBlur={handleTextCommit}
+                />
+                <button
+                  onClick={handleTextCommit}
+                  className="ml-1 px-2 py-0.5 bg-emerald-500 text-black font-bold text-[10px] rounded"
+                >
+                  OK
+                </button>
+              </div>
+            )}
 
+            {/* Bottom Right Floating Zoom and History Controls */}
+            <div className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 bg-black/85 border border-white/[0.08] p-1.5 rounded-xl shadow-2xl backdrop-blur-md">
+              <span className="text-[10px] text-emerald-400 font-mono font-black px-1.5 select-none">{Math.round(zoom * 100)}%</span>
+              <div className="w-px h-5 bg-white/[0.08]" />
+              <button
+                onClick={() => handleZoomPanChange(1.0, { x: 0, y: 0 })}
+                className="p-1.5 bg-black/40 border border-white/[0.06] rounded text-[9px] text-gray-300 hover:text-white transition-colors cursor-pointer font-bold"
+                title="Reset Zoom & Pan"
+              >
+                Reset
+              </button>
+              <div className="w-px h-5 bg-white/[0.08]" />
+              <button
+                onClick={handleUndo}
+                disabled={historyIndex <= 0}
+                className="p-2 bg-black/40 border border-white/[0.06] rounded-lg text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5 transition-colors cursor-pointer"
+                title="Undo"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={historyIndex >= whiteboardHistory.length}
+                className="p-2 bg-black/40 border border-white/[0.06] rounded-lg text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5 transition-colors cursor-pointer"
+                title="Redo"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" /></svg>
+              </button>
+              <div className="w-px h-5 bg-white/[0.08] mx-0.5" />
+              <button
+                onClick={handleClearBoard}
+                className="p-2 bg-red-950/15 border border-red-500/20 hover:border-red-500/40 hover:bg-red-950/35 text-red-400 rounded-lg transition-all duration-200 cursor-pointer"
+                title="Clear whiteboard"
+              >
+                <HiOutlineTrash size={14} />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </motion.div>

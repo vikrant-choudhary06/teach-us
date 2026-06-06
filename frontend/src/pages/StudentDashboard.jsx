@@ -129,6 +129,9 @@ export default function StudentDashboard() {
   const [deckChatMessages, setDeckChatMessages] = useState([])
   const [deckChatInput, setDeckChatInput] = useState('')
   const [deckDoubtInput, setDeckDoubtInput] = useState('')
+  const [deckIsSharingWhiteboard, setDeckIsSharingWhiteboard] = useState(false)
+  const [deckZoom, setDeckZoom] = useState(1.0)
+  const [deckPanOffset, setDeckPanOffset] = useState({ x: 0, y: 0 })
 
   // Synced drawing board states
   const canvasRef = useRef(null)
@@ -238,34 +241,56 @@ export default function StudentDashboard() {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    ctx.save();
+    ctx.translate(deckPanOffset.x, deckPanOffset.y);
+    ctx.scale(deckZoom, deckZoom);
+
     // Draw grid background
     ctx.strokeStyle = 'rgba(16, 185, 129, 0.04)';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 / deckZoom;
     const gridStep = 25;
-    for (let x = 0; x < canvas.width; x += gridStep) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    const halfW = 2000;
+    const halfH = 2000;
+    for (let x = -halfW; x < canvas.width + halfW; x += gridStep) {
+      ctx.beginPath(); ctx.moveTo(x, -halfH); ctx.lineTo(x, canvas.height + halfH); ctx.stroke();
     }
-    for (let y = 0; y < canvas.height; y += gridStep) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    for (let y = -halfH; y < canvas.height + halfH; y += gridStep) {
+      ctx.beginPath(); ctx.moveTo(-halfW, y); ctx.lineTo(canvas.width + halfW, y); ctx.stroke();
     }
 
     // Draw history
     deckWhiteboardHistory.forEach(action => {
       drawLiveActionScaled(ctx, action, canvas.width, canvas.height);
     });
+    ctx.restore();
   };
 
   useEffect(() => {
     if (isJoined && liveCanvasRef.current) {
       redrawLiveCanvas();
     }
-  }, [deckWhiteboardHistory, isJoined, activeTab]);
+  }, [deckWhiteboardHistory, isJoined, activeTab, deckZoom, deckPanOffset, deckIsSharingWhiteboard]);
 
   useEffect(() => {
     if (deckChatEndRef.current) {
       deckChatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [deckChatMessages]);
+
+  useEffect(() => {
+    if (deckIsSharingWhiteboard && liveCanvasRef.current) {
+      const canvas = liveCanvasRef.current;
+      const container = canvas.parentElement;
+      if (container) {
+        const timer = setTimeout(() => {
+          canvas.width = container.clientWidth || 800;
+          canvas.height = Math.max(container.clientHeight, 500);
+          redrawLiveCanvas();
+        }, 50);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [deckIsSharingWhiteboard]);
 
 
   const socketRef = useRef(null)
@@ -440,9 +465,21 @@ export default function StudentDashboard() {
       alert(`Join failed: ${message}`)
     })
 
-    socketRef.current.on('student:sync_state', ({ whiteboardHistory, chatMessages, doubts }) => {
+    socketRef.current.on('student:sync_state', ({ whiteboardHistory, chatMessages, doubts, isSharingWhiteboard, zoom, panOffset }) => {
       setDeckWhiteboardHistory(whiteboardHistory || [])
       setDeckChatMessages(chatMessages || [])
+      setDeckIsSharingWhiteboard(isSharingWhiteboard || false)
+      setDeckZoom(zoom || 1.0)
+      setDeckPanOffset(panOffset || { x: 0, y: 0 })
+    })
+
+    socketRef.current.on('student:toggle_share_whiteboard', ({ isSharing }) => {
+      setDeckIsSharingWhiteboard(isSharing)
+    })
+
+    socketRef.current.on('student:sync_zoom_pan', ({ zoom, panOffset }) => {
+      setDeckZoom(zoom)
+      setDeckPanOffset(panOffset)
     })
 
     socketRef.current.on('student:draw_start', ({ x, y, color, size, tool, width, height }) => {
@@ -465,7 +502,11 @@ export default function StudentDashboard() {
       if (!canvas) return;
       redrawLiveCanvas();
       const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.translate(deckPanOffset.x, deckPanOffset.y);
+      ctx.scale(deckZoom, deckZoom);
       drawLiveActionScaled(ctx, tempStrokeRef.current, canvas.width, canvas.height);
+      ctx.restore();
     });
 
     socketRef.current.on('student:draw_end', (data) => {
@@ -1677,29 +1718,44 @@ export default function StudentDashboard() {
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1 min-h-0">
                     
                     {/* LEFT COLUMN: Sync Board (8 columns) */}
-                    <div className="lg:col-span-8 flex flex-col space-y-4 min-h-0">
-                      <div className="border border-white/[0.08] bg-white/[0.02] px-4 py-3 rounded-2xl flex items-center justify-between shadow-lg shrink-0">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                          <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider font-space">Live Whiteboard Sync</h4>
+                    {deckIsSharingWhiteboard ? (
+                      <div className="lg:col-span-8 flex flex-col space-y-4 min-h-0">
+                        <div className="border border-white/[0.08] bg-white/[0.02] px-4 py-3 rounded-2xl flex items-center justify-between shadow-lg shrink-0">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                            <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider font-space">Live Whiteboard Sync</h4>
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-semibold flex items-center gap-2">
+                            <span>Professor is presenting</span>
+                          </div>
                         </div>
-                        <div className="text-[10px] text-gray-400 font-semibold flex items-center gap-2">
-                          <span>Professor is presenting</span>
-                        </div>
-                      </div>
 
-                      <div className="border border-white/[0.08] bg-[#050907]/90 rounded-2xl flex-1 relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] flex flex-col min-h-0">
-                        <div className="flex-1 w-full h-full relative overflow-hidden select-none">
-                          <canvas
-                            ref={liveCanvasRef}
-                            className="absolute inset-0 block w-full h-full"
-                          />
-                          <div className="absolute bottom-4 left-4 pointer-events-none bg-black/50 border border-white/[0.06] backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] text-gray-400 font-semibold shadow-md">
-                            <span>Read-only synced board</span>
+                        <div className="border border-white/[0.08] bg-[#050907]/90 rounded-2xl flex-1 relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] flex flex-col min-h-0">
+                          <div className="flex-1 w-full h-full relative overflow-hidden select-none">
+                            <canvas
+                              ref={liveCanvasRef}
+                              className="absolute inset-0 block w-full h-full"
+                            />
+                            <div className="absolute bottom-4 left-4 pointer-events-none bg-black/50 border border-white/[0.06] backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] text-gray-400 font-semibold shadow-md">
+                              <span>Read-only synced board</span>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="lg:col-span-8 flex flex-col items-center justify-center p-12 border border-white/[0.08] bg-[#070b09]/40 backdrop-blur-xl rounded-3xl text-center space-y-6 min-h-[450px] relative overflow-hidden shadow-2xl">
+                        <div className="absolute top-[-200px] left-[-200px] w-[500px] h-[500px] rounded-full bg-emerald-500/[0.01] blur-[100px] pointer-events-none" />
+                        <div className="w-18 h-18 rounded-2xl bg-[#0b120e] border border-white/[0.05] flex items-center justify-center text-emerald-500/50 shadow-inner">
+                          <HiOutlineStatusOnline size={36} className="animate-pulse" />
+                        </div>
+                        <div className="space-y-2.5 max-w-md relative z-10">
+                          <h3 className="text-lg font-bold text-white font-space tracking-tight">Whiteboard Share is Inactive</h3>
+                          <p className="text-xs text-gray-400 leading-relaxed font-semibold">
+                            The Professor has stopped sharing the whiteboard. Please pay attention to the live lecture. You can still ask doubts and chat in the side panels.
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* RIGHT COLUMN: Sidebar (Submit Doubt & Synced Chat) (4 columns) */}
                     <div className="lg:col-span-4 flex flex-col space-y-4 min-h-0 max-h-full">

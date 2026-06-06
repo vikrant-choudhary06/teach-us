@@ -263,6 +263,38 @@ const runDeckTests = async () => {
       ]);
     });
 
+    // 9. Test Whiteboard Sharing Toggle event
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Timeout waiting for toggle share whiteboard')), 3000);
+
+      studentSocket.on('student:toggle_share_whiteboard', ({ isSharing }) => {
+        if (isSharing === true) {
+          console.log('✅ Student verified student:toggle_share_whiteboard event transmission.');
+          resolve();
+        } else {
+          reject(new Error('Incorrect sharing state received'));
+        }
+      });
+
+      teacherSocket.emit('teacher:toggle_share_whiteboard', { isSharing: true });
+    });
+
+    // 10. Test Zoom and Pan synchronization event
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Timeout waiting for sync zoom pan')), 3000);
+
+      studentSocket.on('student:sync_zoom_pan', ({ zoom, panOffset }) => {
+        if (zoom === 2.5 && panOffset && panOffset.x === 100 && panOffset.y === -150) {
+          console.log('✅ Student verified student:sync_zoom_pan event transmission.');
+          resolve();
+        } else {
+          reject(new Error('Incorrect zoom or pan offset values received'));
+        }
+      });
+
+      teacherSocket.emit('teacher:sync_zoom_pan', { zoom: 2.5, panOffset: { x: 100, y: -150 } });
+    });
+
     console.log('\n====================================================');
     console.log(' 🎉 ALL LIVE FLIGHT DECK WEB SOCKET SERVICES VERIFIED');
     console.log('====================================================\n');
