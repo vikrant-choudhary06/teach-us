@@ -111,12 +111,20 @@ export const loginUser = async (req, res) => {
         });
       }
 
+      if (user.role === 'Student' && !user.uid) {
+        const cleanName = user.name.replace(/\s+/g, '').toUpperCase();
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        user.uid = `${cleanName}#${randomSuffix}`;
+        await user.save();
+      }
+
       res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         picture: user.picture,
+        uid: user.uid,
         token: generateToken(user._id),
       });
     } else {
@@ -138,6 +146,42 @@ export const getUserProfile = async (req, res) => {
     } else {
       res.status(404).json({ message: 'User not found' });
     }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const updateUserProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const { name, picture, subjectsTaught, experience, qualification, aboutMe, credits } = req.body;
+
+    if (name !== undefined) user.name = name;
+    if (picture !== undefined) user.picture = picture;
+    if (subjectsTaught !== undefined) user.subjectsTaught = subjectsTaught;
+    if (experience !== undefined) user.experience = experience;
+    if (qualification !== undefined) user.qualification = qualification;
+    if (aboutMe !== undefined) user.aboutMe = aboutMe;
+    if (credits !== undefined) user.credits = credits;
+
+    const updatedUser = await user.save();
+    res.json({
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      picture: updatedUser.picture,
+      uid: updatedUser.uid,
+      subjectsTaught: updatedUser.subjectsTaught,
+      experience: updatedUser.experience,
+      qualification: updatedUser.qualification,
+      aboutMe: updatedUser.aboutMe,
+      credits: updatedUser.credits,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -177,6 +221,12 @@ export const googleLogin = async (req, res) => {
         user.picture = picture;
         updated = true;
       }
+      if (user.role === 'Student' && !user.uid) {
+        const cleanName = user.name.replace(/\s+/g, '').toUpperCase();
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        user.uid = `${cleanName}#${randomSuffix}`;
+        updated = true;
+      }
       if (updated) {
         await user.save();
       }
@@ -203,6 +253,7 @@ export const googleLogin = async (req, res) => {
       email: user.email,
       role: user.role,
       picture: user.picture,
+      uid: user.uid,
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -258,6 +309,7 @@ export const verifyOTP = async (req, res) => {
       email: user.email,
       role: user.role,
       picture: user.picture,
+      uid: user.uid,
       token: generateToken(user._id),
       message: 'Account verified successfully!'
     });

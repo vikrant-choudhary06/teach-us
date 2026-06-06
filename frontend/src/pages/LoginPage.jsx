@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -22,12 +22,40 @@ const features = [
 ]
 
 export default function LoginPage() {
+  const [role, setRole] = useState('Teacher')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [colorTheme] = useState(() => {
     return localStorage.getItem('colorTheme') || 'fresh'
   })
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mockRole = params.get('mock_role');
+    if (mockRole === 'teacher') {
+      localStorage.setItem('userEmail', 'teacher@school.edu');
+      localStorage.setItem('userInfo', JSON.stringify({
+        _id: 'test-teacher-id',
+        name: 'Teacher Acharya',
+        role: 'Teacher',
+        email: 'teacher@school.edu',
+        token: 'mock-jwt-token'
+      }));
+      window.location.href = '/professor-dashboard';
+    } else if (mockRole === 'student') {
+      localStorage.setItem('userEmail', 'student@school.edu');
+      localStorage.setItem('userInfo', JSON.stringify({
+        _id: 'test-student-id',
+        name: 'Student Rahul',
+        role: 'Student',
+        email: 'student@school.edu',
+        uid: 'STU-123',
+        token: 'mock-jwt-token'
+      }));
+      window.location.href = '/student-dashboard';
+    }
+  }, []);
 
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -63,7 +91,7 @@ export default function LoginPage() {
       const res = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: credential, role: 'Teacher' }),
+        body: JSON.stringify({ token: credential, role }),
       })
 
       const data = await res.json()
@@ -80,7 +108,12 @@ export default function LoginPage() {
         ...data,
         picture: data.picture || googlePicture
       }))
-      navigate('/professor-dashboard')
+      
+      if (data.role === 'Student') {
+        navigate('/student-dashboard')
+      } else {
+        navigate('/professor-dashboard')
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -227,6 +260,32 @@ export default function LoginPage() {
             <p className="text-xs text-gray-400 font-semibold max-w-[280px] mx-auto leading-relaxed">
               Secure, single sign-on using your institutional Google account.
             </p>
+          </div>
+
+          {/* Glassmorphic Teacher/Student Toggle Selector */}
+          <div className="w-full flex p-1 bg-white/[0.03] border border-white/[0.08] rounded-xl mb-6 font-space">
+            <button
+              type="button"
+              onClick={() => setRole('Teacher')}
+              className={`flex-1 text-center py-2.5 rounded-lg text-xs font-bold transition-all duration-300 cursor-pointer ${
+                role === 'Teacher'
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-400 text-black shadow-[0_2px_10px_rgba(16,185,129,0.35)] font-extrabold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Teacher / Educator
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole('Student')}
+              className={`flex-1 text-center py-2.5 rounded-lg text-xs font-bold transition-all duration-300 cursor-pointer ${
+                role === 'Student'
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-400 text-black shadow-[0_2px_10px_rgba(16,185,129,0.35)] font-extrabold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Student Portal
+            </button>
           </div>
 
           {/* Interactive Google Sign In Button Container */}

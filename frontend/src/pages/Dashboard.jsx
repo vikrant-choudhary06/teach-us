@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
+import { io } from 'socket.io-client'
 import {
   HiOutlineHome,
   HiOutlineFolder,
@@ -45,6 +46,68 @@ import {
 } from 'react-icons/hi'
 
 export default function Dashboard() {
+  const socketRef = useRef(null)
+  const [deckUid, setDeckUid] = useState(null)
+  const navigate = useNavigate()
+
+  // Lifted Live Flight Deck States to survive tab switches
+  const [isDeckLive, setIsDeckLive] = useState(false)
+  const [deckPin, setDeckPin] = useState('')
+  const [deckJoinedStudents, setDeckJoinedStudents] = useState([])
+  const [deckDoubts, setDeckDoubts] = useState([])
+  const [deckChatMessages, setDeckChatMessages] = useState([])
+  const [deckWhiteboardHistory, setDeckWhiteboardHistory] = useState([])
+  const [deckHistoryIndex, setDeckHistoryIndex] = useState(0)
+
+  useEffect(() => {
+    const savedInfo = localStorage.getItem('userInfo')
+    if (savedInfo) {
+      try {
+        const info = JSON.parse(savedInfo)
+        if (info.role === 'Student') {
+          navigate('/student-dashboard')
+          return
+        }
+      } catch (e) {}
+    } else {
+      navigate('/login')
+      return
+    }
+
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    socketRef.current = io(API_URL)
+
+    const newDeckUid = Math.floor(100000 + Math.random() * 900000).toString()
+    setDeckUid(newDeckUid)
+
+    // Register globally-active Live Flight Deck listeners
+    socketRef.current.on('teacher:update_students', (studentsList) => {
+      setDeckJoinedStudents(studentsList || []);
+    });
+
+    socketRef.current.on('deck:doubt_received', (doubt) => {
+      setDeckDoubts(prev => [...prev, doubt]);
+    });
+
+    socketRef.current.on('deck:doubt_resolved', (doubtId) => {
+      setDeckDoubts(prev => prev.filter(d => d.id !== doubtId));
+    });
+
+    socketRef.current.on('deck:chat_message', (msg) => {
+      setDeckChatMessages(prev => [...prev, msg]);
+    });
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.off('teacher:update_students');
+        socketRef.current.off('deck:doubt_received');
+        socketRef.current.off('deck:doubt_resolved');
+        socketRef.current.off('deck:chat_message');
+        socketRef.current.disconnect();
+      }
+    }
+  }, [])
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const email = localStorage.getItem('userEmail')
     if (email && email !== 'educator@acharya.ai') {
@@ -91,6 +154,11 @@ export default function Dashboard() {
     return 'Educator'
   })
   const [userPicture, setUserPicture] = useState('')
+  const [subjectsTaught, setSubjectsTaught] = useState(() => localStorage.getItem('profile_subjectsTaught') || '')
+  const [experience, setExperience] = useState(() => localStorage.getItem('profile_experience') || '')
+  const [qualification, setQualification] = useState(() => localStorage.getItem('profile_qualification') || '')
+  const [aboutMe, setAboutMe] = useState(() => localStorage.getItem('profile_aboutMe') || 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.')
+  const [memberSince, setMemberSince] = useState(() => localStorage.getItem('profile_memberSince') || '')
   const [isAIChatOpen, setIsAIChatOpen] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [credits, setCredits] = useState(() => {
@@ -110,7 +178,7 @@ export default function Dashboard() {
   const [weeklyActivity, setWeeklyActivity] = useState(() => {
     return parseInt(localStorage.getItem('stats_weeklyActivity') || '0', 10)
   })
-  const navigate = useNavigate()
+
 
   useEffect(() => {
     localStorage.setItem('stats_totalTopics', totalTopics.toString())
@@ -210,6 +278,12 @@ export default function Dashboard() {
       currentProgress: `Solving: ${contentSummary}`,
       status: 'focused',
     })))
+    
+    // Broadcast material to students via sockets
+    if (socketRef.current && deployedMaterial) {
+      socketRef.current.emit('teacher:push_material', deployedMaterial);
+    }
+    
     showToast(`Worksheet from "${sourceName}" pushed to all ${students.length} student workstations!`, 'success')
   }
 
@@ -255,15 +329,15 @@ export default function Dashboard() {
                     id: st._id,
                     name: st.name,
                     email: st.email || '',
-                    status: 'focused',
+                    status: st.status || 'focused',
                     lastActive: 'Active now',
-                    assignmentStatus: 'Not Started',
-                    currentProgress: 'Idle',
-                    doubt: null,
-                    row: Math.floor(index / 3),
-                    col: index % 3,
-                    grade: 'N/A',
-                    aiFeedback: ''
+                    assignmentStatus: st.assignmentStatus || 'Not Started',
+                    currentProgress: st.currentProgress || 'Idle',
+                    doubt: st.doubt !== undefined ? st.doubt : null,
+                    row: st.row !== undefined ? st.row : Math.floor(index / 3),
+                    col: st.col !== undefined ? st.col : index % 3,
+                    grade: st.grade || 'N/A',
+                    aiFeedback: st.aiFeedback || ''
                   }))
                   setStudents(mapped)
                   localStorage.setItem('real_students', JSON.stringify(mapped))
@@ -285,12 +359,26 @@ export default function Dashboard() {
               })
               if (res.ok) {
                 const data = await res.json()
+                if (data.name) {
+                  setUserName(data.name)
+                  localStorage.setItem('profile_name', data.name)
+                }
+                if (data.picture) {
+                  setUserPicture(data.picture)
+                  localStorage.setItem('profile_image', data.picture)
+                }
+                if (data.credits !== undefined) setCredits(data.credits)
+                if (data.subjectsTaught !== undefined) setSubjectsTaught(data.subjectsTaught)
+                if (data.experience !== undefined) setExperience(data.experience)
+                if (data.qualification !== undefined) setQualification(data.qualification)
+                if (data.aboutMe !== undefined) setAboutMe(data.aboutMe)
                 if (data.createdAt) {
                   const date = new Date(data.createdAt)
                   const day = String(date.getDate()).padStart(2, '0')
                   const month = String(date.getMonth() + 1).padStart(2, '0')
                   const year = date.getFullYear()
                   const formattedDate = `${day}/${month}/${year}`
+                  setMemberSince(formattedDate)
                   localStorage.setItem('profile_memberSince', formattedDate)
                 }
               }
@@ -334,6 +422,26 @@ export default function Dashboard() {
   useEffect(() => {
     if (userEmail && userEmail !== 'educator@acharya.ai') {
       localStorage.setItem(`acharyai_${userEmail}_credits`, credits.toString())
+      const syncCredits = async () => {
+        try {
+          const savedInfo = localStorage.getItem('userInfo')
+          if (!savedInfo) return
+          const info = JSON.parse(savedInfo)
+          if (!info.token) return
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+          await fetch(`${API_URL}/api/auth/profile`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${info.token}`
+            },
+            body: JSON.stringify({ credits })
+          })
+        } catch (e) {
+          console.error('Failed to sync credits with backend:', e)
+        }
+      }
+      syncCredits()
     }
   }, [credits, userEmail])
 
@@ -384,6 +492,10 @@ export default function Dashboard() {
         const newStudent = await res.json()
         showToast(`Student "${name}" enrolled successfully!`, 'success')
         
+        if (socketRef.current) {
+          socketRef.current.emit('teacher:add_student', newStudent)
+        }
+        
         // Fetch updated student list
         const reRes = await fetch(`${API_URL}/api/students`, {
           headers: {
@@ -415,27 +527,65 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error(err)
-      // Offline fallback: save locally
-      setStudents(prev => {
-        const index = prev.length
-        const updated = [...prev, {
-          id: 'local-' + Date.now(),
-          name,
-          email,
-          status: 'focused',
-          lastActive: 'Active now',
-          assignmentStatus: 'Not Started',
-          currentProgress: 'Idle',
-          doubt: null,
-          row: Math.floor(index / 3),
-          col: index % 3,
-          grade: 'N/A',
-          aiFeedback: ''
-        }]
-        localStorage.setItem('real_students', JSON.stringify(updated))
-        return updated
+      showToast(`Failed to add student. Please check your network connection.`, 'error')
+    }
+  }
+
+  const handleAddStudentByUid = async (uid) => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      if (!info.token) return
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/students/add-by-uid`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${info.token}`
+        },
+        body: JSON.stringify({ uid, classroom: 'General' })
       })
-      showToast(`Student "${name}" added locally (Offline).`, 'success')
+
+      if (res.ok) {
+        const newStudent = await res.json()
+        showToast(`Student with UID "${uid}" enrolled successfully!`, 'success')
+        
+        if (socketRef.current) {
+          socketRef.current.emit('teacher:add_student', newStudent)
+        }
+        
+        // Fetch updated student list
+        const reRes = await fetch(`${API_URL}/api/students`, {
+          headers: { 'Authorization': `Bearer ${info.token}` }
+        })
+        if (reRes.ok) {
+          const reData = await reRes.json()
+          const mapped = reData.map((st, index) => ({
+            id: st._id,
+            name: st.name,
+            email: st.email || '',
+            status: 'focused',
+            lastActive: 'Active now',
+            assignmentStatus: 'Not Started',
+            currentProgress: 'Idle',
+            doubt: null,
+            row: Math.floor(index / 3),
+            col: index % 3,
+            grade: 'N/A',
+            aiFeedback: ''
+          }))
+          setStudents(mapped)
+          localStorage.setItem('real_students', JSON.stringify(mapped))
+        }
+      } else {
+        const errData = await res.json()
+        showToast(errData.message || 'Failed to add student.', 'error')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast(`Failed to add student by UID.`, 'error')
     }
   }
 
@@ -446,6 +596,7 @@ export default function Dashboard() {
     { id: 'digitizer', name: 'Paper Digitizer', icon: HiOutlineDocumentText, description: 'Digitize handwritten exams & assignments' },
     { id: 'visual-aids', name: 'Visual Aids', icon: HiOutlineSparkles, description: 'Create engaging diagrams and charts for your lessons' },
     { id: 'math-helper', name: 'Math Helper', icon: HiOutlineCalculator, description: 'Solve any math problem with step-by-step explanations' },
+    { id: 'course-creator', name: 'Branching Course Creator', icon: HiOutlineBookOpen, description: 'Create and deploy custom branching syllabus routes for students' },
   ]
 
   const renderContent = () => {
@@ -465,6 +616,9 @@ export default function Dashboard() {
       case 'flight-deck':
         return (
           <LiveFlightDeck
+            socketRef={socketRef}
+            deckUid={deckUid}
+            handleAddStudentByUid={handleAddStudentByUid}
             digitizedResult={digitizedResult}
             setActiveTab={setActiveTab}
             students={students}
@@ -473,11 +627,26 @@ export default function Dashboard() {
             deployedMaterial={deployedMaterial}
             setDeployedMaterial={setDeployedMaterial}
             handleAddStudent={handleAddStudent}
+            isLive={isDeckLive}
+            setIsLive={setIsDeckLive}
+            deckPin={deckPin}
+            setDeckPin={setDeckPin}
+            joinedStudents={deckJoinedStudents}
+            setJoinedStudents={setDeckJoinedStudents}
+            doubts={deckDoubts}
+            setDoubts={setDeckDoubts}
+            chatMessages={deckChatMessages}
+            setChatMessages={setDeckChatMessages}
+            whiteboardHistory={deckWhiteboardHistory}
+            setWhiteboardHistory={setDeckWhiteboardHistory}
+            historyIndex={deckHistoryIndex}
+            setHistoryIndex={setDeckHistoryIndex}
           />
         )
       case 'math-helper':
         return (
           <MathHelper
+            showToast={showToast}
             pushWorksheetToClass={pushWorksheetToClass}
             onProblemSolved={() => {
               setWeeklyActivity(prev => prev + 1)
@@ -541,6 +710,11 @@ export default function Dashboard() {
             assetsCreated={assetsCreated}
             totalStudents={students.length}
             weeklyActivity={weeklyActivity}
+            subjectsTaught={subjectsTaught}
+            experience={experience}
+            qualification={qualification}
+            aboutMe={aboutMe}
+            memberSince={memberSince}
             onEditRedirect={() => {
               setActiveTab('settings')
               setSettingsTab('profile')
@@ -563,6 +737,28 @@ export default function Dashboard() {
             setCurrentTab={setSettingsTab}
             totalTopics={totalTopics}
             assetsCreated={assetsCreated}
+            subjectsTaught={subjectsTaught}
+            setSubjectsTaught={setSubjectsTaught}
+            experience={experience}
+            setExperience={setExperience}
+            qualification={qualification}
+            setQualification={setQualification}
+            aboutMe={aboutMe}
+            setAboutMe={setAboutMe}
+            memberSince={memberSince}
+            setMemberSince={setMemberSince}
+            userPicture={userPicture}
+            setUserPicture={setUserPicture}
+          />
+        )
+      case 'course-creator':
+        return (
+          <BranchingCourseCreator
+            showToast={showToast}
+            onCourseCreated={() => {
+              setTotalTopics(prev => prev + 1)
+              setWeeklyActivity(prev => prev + 1)
+            }}
           />
         )
       default:
@@ -1184,708 +1380,1043 @@ function FeatureWorkspace({ tabId, menuItem }) {
 }
 
 
-function LiveFlightDeck({ digitizedResult, setActiveTab, students, setStudents, pushWorksheetToClass, deployedMaterial, setDeployedMaterial, handleAddStudent }) {
-  const [activeMode, setActiveMode] = useState('presentation') // 'presentation' | 'whiteboard'
-  const [brushColor, setBrushColor] = useState('#10b981')
-  const [brushWidth, setBrushWidth] = useState(4)
-  const [isDrawing, setIsDrawing] = useState(false)
-  const [selectedStudentId, setSelectedStudentId] = useState(null)
+function LiveFlightDeck({
+  socketRef,
+  deckUid: initialDeckUid,
+  handleAddStudentByUid,
+  digitizedResult,
+  setActiveTab,
+  students,
+  setStudents,
+  pushWorksheetToClass,
+  deployedMaterial,
+  setDeployedMaterial,
+  handleAddStudent,
   
-  const [pdfUrl, setPdfUrl] = useState(null)
-  const [pdfName, setPdfName] = useState('')
-  const [isDragOver, setIsDragOver] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const fileInputRef = useRef(null)
+  // Destructured props from parent Dashboard component
+  isLive,
+  setIsLive,
+  deckPin,
+  setDeckPin,
+  joinedStudents,
+  setJoinedStudents,
+  doubts,
+  setDoubts,
+  chatMessages,
+  setChatMessages,
+  whiteboardHistory,
+  setWhiteboardHistory,
+  historyIndex,
+  setHistoryIndex
+}) {
+  const [chatInput, setChatInput] = useState('');
+  
+  // Whiteboard States (UI/Drawing Configuration remain local/transient)
+  const [tool, setTool] = useState('pencil'); // 'pencil' | 'line' | 'rect' | 'circle' | 'eraser' | 'text'
+  const [brushColor, setBrushColor] = useState('#10b981');
+  const [brushWidth, setBrushWidth] = useState(4);
+  
+  // Drawing internal refs & states
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const [textInputPos, setTextInputPos] = useState(null);
+  const [textInputValue, setTextInputValue] = useState('');
+  
+  const canvasRef = useRef(null);
+  const currentStrokeRef = useRef(null);
+  
+  // Selection and Drag-Move engine states
+  const [selectedElementIdx, setSelectedElementIdx] = useState(-1);
+  const draggedOriginalElementRef = useRef(null);
+  
+  // Excalidraw-like config states
+  const [fillColor, setFillColor] = useState('transparent');
+  const [opacity, setOpacity] = useState(100);
+  const [fontFamily, setFontFamily] = useState('sans-serif');
+  const [fontSize, setFontSize] = useState(4);
+  const [textAlign, setTextAlign] = useState('left');
 
-  const handlePdfDrop = (e) => {
-    e.preventDefault()
-    setIsDragOver(false)
-    const files = Array.from(e.dataTransfer.files)
-    if (files.length > 0 && files[0].type === 'application/pdf') {
-      loadPdf(files[0])
-    } else {
-      alert('Please upload a valid PDF file.')
-    }
-  }
-
-  const handlePdfChange = (e) => {
-    const files = Array.from(e.target.files)
-    if (files.length > 0 && files[0].type === 'application/pdf') {
-      loadPdf(files[0])
-    } else {
-      alert('Please upload a valid PDF file.')
-    }
-  }
-
-  const loadPdf = (file) => {
-    setIsUploading(true)
-    const objectUrl = URL.createObjectURL(file)
-    setPdfUrl(objectUrl)
-    setPdfName(file.name)
-    setIsUploading(false)
-  }
-
-  const canvasRef = useRef(null)
-
-  // Simulation: toggle student focus states and doubts periodically
+  // Auto scroll chat
+  const chatEndRef = useRef(null);
   useEffect(() => {
-    const interval = setInterval(() => {
-      setStudents(prev => prev.map(s => {
-        let updated = { ...s }
-        // Randomly toggle focus
-        if (Math.random() > 0.8) {
-          const newStatus = s.status === 'focused' ? 'distracted' : 'focused'
-          updated.status = newStatus
-          updated.lastActive = newStatus === 'focused' ? 'Active now' : 'Tabbed out'
-        }
-        // Randomly raise a doubt/hand
-        if (Math.random() > 0.93 && !s.doubt) {
-          const doubtOptions = [
-            'Confused about derivatives',
-            'How is limit defined here?',
-            'What is the formula for eigenvectors?',
-            'Is this step on the test?',
-            'Can we do another example?'
-          ]
-          updated.doubt = doubtOptions[Math.floor(Math.random() * doubtOptions.length)]
-        }
-        return updated
-      }))
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [setStudents])
-
-  // Canvas Size Setup on mode switch
-  useEffect(() => {
-    if (activeMode === 'whiteboard' && canvasRef.current) {
-      const canvas = canvasRef.current
-      const container = canvas.parentElement
-      canvas.width = container.clientWidth
-      canvas.height = Math.max(container.clientHeight, 350)
-      const ctx = canvas.getContext('2d')
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-      
-      // Draw grid helper on whiteboard for spatial style
-      ctx.strokeStyle = 'rgba(16, 185, 129, 0.03)'
-      ctx.lineWidth = 1
-      const step = 20
-      for (let x = 0; x < canvas.width; x += step) {
-        ctx.beginPath()
-        ctx.moveTo(x, 0)
-        ctx.lineTo(x, canvas.height)
-        ctx.stroke()
-      }
-      for (let y = 0; y < canvas.height; y += step) {
-        ctx.beginPath()
-        ctx.moveTo(0, y)
-        ctx.lineTo(canvas.width, y)
-        ctx.stroke()
-      }
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [activeMode])
+  }, [chatMessages]);
 
-  // Canvas drawing handlers
-  const startDrawing = (e) => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    const rect = canvas.getBoundingClientRect()
-    ctx.beginPath()
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top)
-    setIsDrawing(true)
-  }
+  // Redraw canvas on history changes or resize
+  useEffect(() => {
+    if (isLive && canvasRef.current) {
+      redrawCanvas();
+    }
+  }, [whiteboardHistory, historyIndex, isLive]);
 
-  const draw = (e) => {
-    if (!isDrawing) return
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    const rect = canvas.getBoundingClientRect()
-    ctx.strokeStyle = brushColor
-    ctx.lineWidth = brushWidth
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top)
-    ctx.stroke()
-  }
+  const handleStartDeck = () => {
+    const pin = initialDeckUid || Math.floor(100000 + Math.random() * 900000).toString();
+    setDeckPin(pin);
+    setIsLive(true);
+    if (socketRef.current) {
+      socketRef.current.emit('teacher:start_deck', { deckUid: pin });
+    }
+  };
 
-  const stopDrawing = () => {
-    setIsDrawing(false)
-  }
+  const redrawCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const clearCanvas = () => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    // Draw grid background
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.04)';
+    ctx.lineWidth = 1;
+    const gridStep = 25;
+    for (let x = 0; x < canvas.width; x += gridStep) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += gridStep) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+
+    // Draw active history
+    const activeHistory = whiteboardHistory.slice(0, historyIndex);
+    activeHistory.forEach(action => {
+      drawActionScaled(ctx, action, canvas.width, canvas.height);
+    });
+  };
+
+  const drawActionScaled = (ctx, action, targetWidth, targetHeight) => {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     
-    // Redraw grid helper
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.03)'
-    ctx.lineWidth = 1
-    const step = 20
-    for (let x = 0; x < canvas.width; x += step) {
-      ctx.beginPath()
-      ctx.moveTo(x, 0)
-      ctx.lineTo(x, canvas.height)
-      ctx.stroke()
+    const scaleX = targetWidth / (action.canvasWidth || 800);
+    const scaleY = targetHeight / (action.canvasHeight || 600);
+    
+    // Save previous alpha
+    const oldAlpha = ctx.globalAlpha;
+    if (action.opacity !== undefined) {
+      ctx.globalAlpha = action.opacity / 100;
     }
-    for (let y = 0; y < canvas.height; y += step) {
-      ctx.beginPath()
-      ctx.moveTo(0, y)
-      ctx.lineTo(canvas.width, y)
-      ctx.stroke()
+    
+    if (action.type === 'pencil' || action.type === 'eraser') {
+      if (action.points.length < 1) return;
+      ctx.beginPath();
+      ctx.strokeStyle = action.type === 'eraser' ? '#050907' : action.color;
+      ctx.lineWidth = action.size * Math.min(scaleX, scaleY);
+      ctx.moveTo(action.points[0].x * scaleX, action.points[0].y * scaleY);
+      for (let i = 1; i < action.points.length; i++) {
+        ctx.lineTo(action.points[i].x * scaleX, action.points[i].y * scaleY);
+      }
+      ctx.stroke();
+    } else if (action.type === 'shape') {
+      ctx.strokeStyle = action.color;
+      ctx.lineWidth = action.size * Math.min(scaleX, scaleY);
+      ctx.fillStyle = action.fillColor || 'transparent';
+      
+      const x1 = action.x1 * scaleX;
+      const y1 = action.y1 * scaleY;
+      const x2 = action.x2 * scaleX;
+      const y2 = action.y2 * scaleY;
+      
+      if (action.shape === 'line') {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      } else if (action.shape === 'rect') {
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        }
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      } else if (action.shape === 'circle') {
+        ctx.beginPath();
+        const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        ctx.arc(x1, y1, r, 0, 2 * Math.PI);
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          ctx.fill();
+        }
+        ctx.stroke();
+      } else if (action.shape === 'diamond') {
+        ctx.beginPath();
+        ctx.moveTo(x1 + (x2 - x1) / 2, y1);
+        ctx.lineTo(x2, y1 + (y2 - y1) / 2);
+        ctx.lineTo(x1 + (x2 - x1) / 2, y2);
+        ctx.lineTo(x1, y1 + (y2 - y1) / 2);
+        ctx.closePath();
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          ctx.fill();
+        }
+        ctx.stroke();
+      } else if (action.shape === 'arrow') {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const arrowLength = 12 * Math.min(scaleX, scaleY);
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - arrowLength * Math.cos(angle - Math.PI / 6), y2 - arrowLength * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - arrowLength * Math.cos(angle + Math.PI / 6), y2 - arrowLength * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fillStyle = action.color;
+        ctx.fill();
+      }
+    } else if (action.type === 'text') {
+      ctx.fillStyle = action.color;
+      const scaledSize = action.size * Math.min(scaleX, scaleY);
+      const fontFamily = action.fontFamily === 'handdrawn' ? '"Comic Sans MS", cursive, sans-serif' : action.fontFamily === 'mono' ? 'monospace' : 'sans-serif';
+      ctx.font = `${scaledSize * 3 + 12}px ${fontFamily}`;
+      ctx.textAlign = action.textAlign || 'left';
+      ctx.fillText(action.text, action.x * scaleX, action.y * scaleY);
+      ctx.textAlign = 'left'; // Reset
     }
-  }
+    
+    // Restore alpha
+    ctx.globalAlpha = oldAlpha;
+  };
 
-  // Seat Swapping / Drag Drop Handlers
-  const handleDragStart = (e, studentId) => {
-    e.dataTransfer.setData('text/plain', studentId.toString())
-  }
-
-  const handleDragOver = (e) => {
-    e.preventDefault()
-  }
-
-  const handleDrop = (e, targetRow, targetCol) => {
-    e.preventDefault()
-    const draggedStudentId = parseInt(e.dataTransfer.getData('text/plain'), 10)
-    if (isNaN(draggedStudentId)) return
-
-    setStudents(prev => {
-      const copy = prev.map(s => ({ ...s }))
-      const sourceStudent = copy.find(s => s.id === draggedStudentId)
-      const targetStudent = copy.find(s => s.row === targetRow && s.col === targetCol)
-
-      if (sourceStudent) {
-        if (targetStudent) {
-          // Swap positions
-          const tempRow = sourceStudent.row
-          const tempCol = sourceStudent.col
-          sourceStudent.row = targetStudent.row
-          sourceStudent.col = targetStudent.col
-          targetStudent.row = tempRow
-          targetStudent.col = tempCol
+  const isHit = (action, x, y, threshold) => {
+    if (action.type === 'pencil' || action.type === 'eraser') {
+      return action.points.some(p => Math.sqrt(Math.pow(p.x - x, 2) + Math.pow(p.y - y, 2)) <= threshold + action.size);
+    } else if (action.type === 'shape') {
+      const { x1, y1, x2, y2, shape } = action;
+      if (shape === 'line' || shape === 'arrow') {
+        const A = x - x1;
+        const B = y - y1;
+        const C = x2 - x1;
+        const D = y2 - y1;
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        let param = -1;
+        if (lenSq !== 0) param = dot / lenSq;
+        let xx, yy;
+        if (param < 0) {
+          xx = x1;
+          yy = y1;
+        } else if (param > 1) {
+          xx = x2;
+          yy = y2;
         } else {
-          // Move to empty cell
-          sourceStudent.row = targetRow
-          sourceStudent.col = targetCol
+          xx = x1 + param * C;
+          yy = y1 + param * D;
+        }
+        const dist = Math.sqrt(Math.pow(x - xx, 2) + Math.pow(y - yy, 2));
+        return dist <= threshold + action.size;
+      } else if (shape === 'rect') {
+        const minX = Math.min(x1, x2);
+        const maxX = Math.max(x1, x2);
+        const minY = Math.min(y1, y2);
+        const maxY = Math.max(y1, y2);
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          return x >= minX && x <= maxX && y >= minY && y <= maxY;
+        }
+        const nearLeft = Math.abs(x - minX) <= threshold;
+        const nearRight = Math.abs(x - maxX) <= threshold;
+        const nearTop = Math.abs(y - minY) <= threshold;
+        const nearBottom = Math.abs(y - maxY) <= threshold;
+        return ((nearLeft || nearRight) && y >= minY && y <= maxY) ||
+               ((nearTop || nearBottom) && x >= minX && x <= maxX);
+      } else if (shape === 'circle') {
+        const cx = x1;
+        const cy = y1;
+        const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        const dist = Math.sqrt(Math.pow(x - cx, 2) + Math.pow(y - cy, 2));
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          return dist <= r + threshold;
+        }
+        return Math.abs(dist - r) <= threshold;
+      } else if (shape === 'diamond') {
+        const minX = Math.min(x1, x2);
+        const maxX = Math.max(x1, x2);
+        const minY = Math.min(y1, y2);
+        const maxY = Math.max(y1, y2);
+        const cx = minX + (maxX - minX) / 2;
+        const cy = minY + (maxY - minY) / 2;
+        const rx = (maxX - minX) / 2;
+        const ry = (maxY - minY) / 2;
+        if (rx === 0 || ry === 0) return false;
+        const term = Math.abs(x - cx) / rx + Math.abs(y - cy) / ry;
+        if (action.fillColor && action.fillColor !== 'transparent') {
+          return term <= 1.1;
+        }
+        return Math.abs(term - 1.0) <= 0.2;
+      }
+    } else if (action.type === 'text') {
+      const { x: tx, y: ty, text, size } = action;
+      const fontHeight = size * 3 + 12;
+      const fontWidth = text.length * fontHeight * 0.6;
+      return x >= tx && x <= tx + fontWidth && y >= ty - fontHeight && y <= ty;
+    }
+    return false;
+  };
+
+  const getCanvasCoords = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  };
+
+  const handleMouseDown = (e) => {
+    if (textInputPos) return; // Typing text
+    const coords = getCanvasCoords(e);
+    
+    if (tool === 'text') {
+      setTextInputPos(coords);
+      setTextInputValue('');
+      return;
+    }
+
+    setIsDrawing(true);
+    setStartPos(coords);
+    const canvas = canvasRef.current;
+
+    if (tool === 'select') {
+      const clickProximity = 8;
+      let foundIndex = -1;
+      const activeHistory = whiteboardHistory.slice(0, historyIndex);
+      // Search from top to bottom (reverse order)
+      for (let i = activeHistory.length - 1; i >= 0; i--) {
+        if (isHit(activeHistory[i], coords.x, coords.y, clickProximity)) {
+          foundIndex = i;
+          break;
         }
       }
-      return copy
-    })
-  }
-
-  const getStudentAt = (row, col) => {
-    return students.find(s => s.row === row && s.col === col)
-  }
-
-  const selectedStudent = students.find(s => s.id === selectedStudentId)
-
-  const handleResolveDoubt = (studentId) => {
-    setStudents(prev => prev.map(s => {
-      if (s.id === studentId) {
-        return { ...s, doubt: null, status: 'focused' }
+      if (foundIndex !== -1) {
+        setSelectedElementIdx(foundIndex);
+        draggedOriginalElementRef.current = JSON.parse(JSON.stringify(activeHistory[foundIndex]));
+      } else {
+        setSelectedElementIdx(-1);
+        draggedOriginalElementRef.current = null;
       }
-      return s
-    }))
+      return;
+    }
+
+    if (tool === 'pencil' || tool === 'eraser') {
+      const newAction = {
+        type: tool,
+        points: [coords],
+        color: brushColor,
+        size: brushWidth,
+        opacity,
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height
+      };
+      currentStrokeRef.current = newAction;
+      if (socketRef.current) {
+        socketRef.current.emit('teacher:draw_start', {
+          x: coords.x,
+          y: coords.y,
+          color: tool === 'eraser' ? '#050907' : brushColor,
+          size: brushWidth,
+          tool,
+          width: canvas.width,
+          height: canvas.height
+        });
+      }
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDrawing) return;
+    const coords = getCanvasCoords(e);
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    if (tool === 'select') {
+      if (selectedElementIdx === -1 || !draggedOriginalElementRef.current) return;
+      const deltaX = coords.x - startPos.x;
+      const deltaY = coords.y - startPos.y;
+      const original = draggedOriginalElementRef.current;
+      
+      let updated;
+      if (original.type === 'pencil' || original.type === 'eraser') {
+        updated = {
+          ...original,
+          points: original.points.map(p => ({ x: p.x + deltaX, y: p.y + deltaY }))
+        };
+      } else if (original.type === 'shape') {
+        updated = {
+          ...original,
+          x1: original.x1 + deltaX,
+          y1: original.y1 + deltaY,
+          x2: original.x2 + deltaX,
+          y2: original.y2 + deltaY
+        };
+      } else if (original.type === 'text') {
+        updated = {
+          ...original,
+          x: original.x + deltaX,
+          y: original.y + deltaY
+        };
+      }
+      
+      if (updated) {
+        const copy = [...whiteboardHistory];
+        copy[selectedElementIdx] = updated;
+        setWhiteboardHistory(copy);
+      }
+      return;
+    }
+
+    if (tool === 'pencil' || tool === 'eraser') {
+      currentStrokeRef.current.points.push(coords);
+      if (socketRef.current) {
+        socketRef.current.emit('teacher:draw_move', {
+          x: coords.x,
+          y: coords.y,
+          tool
+        });
+      }
+      redrawCanvas();
+      ctx.beginPath();
+      ctx.strokeStyle = tool === 'eraser' ? '#050907' : brushColor;
+      ctx.lineWidth = brushWidth;
+      const pts = currentStrokeRef.current.points;
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.stroke();
+    } else {
+      redrawCanvas();
+      ctx.strokeStyle = brushColor;
+      ctx.lineWidth = brushWidth;
+      ctx.fillStyle = fillColor;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      const x1 = startPos.x;
+      const y1 = startPos.y;
+      const x2 = coords.x;
+      const y2 = coords.y;
+      
+      if (tool === 'line') {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      } else if (tool === 'rect') {
+        if (fillColor && fillColor !== 'transparent') {
+          ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+        }
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+      } else if (tool === 'circle') {
+        ctx.beginPath();
+        const r = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        ctx.arc(x1, y1, r, 0, 2 * Math.PI);
+        if (fillColor && fillColor !== 'transparent') {
+          ctx.fill();
+        }
+        ctx.stroke();
+      } else if (tool === 'diamond') {
+        ctx.beginPath();
+        ctx.moveTo(x1 + (x2 - x1) / 2, y1);
+        ctx.lineTo(x2, y1 + (y2 - y1) / 2);
+        ctx.lineTo(x1 + (x2 - x1) / 2, y2);
+        ctx.lineTo(x1, y1 + (y2 - y1) / 2);
+        ctx.closePath();
+        if (fillColor && fillColor !== 'transparent') {
+          ctx.fill();
+        }
+        ctx.stroke();
+      } else if (tool === 'arrow') {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const arrowLength = 12;
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - arrowLength * Math.cos(angle - Math.PI / 6), y2 - arrowLength * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - arrowLength * Math.cos(angle + Math.PI / 6), y2 - arrowLength * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fillStyle = brushColor;
+        ctx.fill();
+      }
+    }
+  };
+
+  const handleMouseUp = (e) => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    
+    if (tool === 'select') {
+      setSelectedElementIdx(-1);
+      draggedOriginalElementRef.current = null;
+      if (socketRef.current) {
+        socketRef.current.emit('teacher:sync_history', whiteboardHistory);
+      }
+      return;
+    }
+
+    const coords = getCanvasCoords(e);
+    const canvas = canvasRef.current;
+    let finalAction = null;
+
+    if (tool === 'pencil' || tool === 'eraser') {
+      finalAction = currentStrokeRef.current;
+    } else {
+      finalAction = {
+        type: 'shape',
+        shape: tool,
+        x1: startPos.x,
+        y1: startPos.y,
+        x2: coords.x,
+        y2: coords.y,
+        color: brushColor,
+        fillColor: fillColor,
+        size: brushWidth,
+        opacity,
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height
+      };
+    }
+
+    if (finalAction) {
+      const historyCopy = whiteboardHistory.slice(0, historyIndex);
+      const newHistory = [...historyCopy, finalAction];
+      setWhiteboardHistory(newHistory);
+      setHistoryIndex(newHistory.length);
+      
+      if (socketRef.current) {
+        socketRef.current.emit('teacher:draw_end', { action: finalAction });
+      }
+    }
+    currentStrokeRef.current = null;
+  };
+
+  const handleTextCommit = () => {
+    if (!textInputValue.trim() || !textInputPos) {
+      setTextInputPos(null);
+      return;
+    }
+    const canvas = canvasRef.current;
+    const finalAction = {
+      type: 'text',
+      text: textInputValue,
+      x: textInputPos.x,
+      y: textInputPos.y + 5,
+      color: brushColor,
+      size: brushWidth,
+      fontFamily: fontFamily,
+      textAlign: textAlign,
+      opacity: opacity,
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height
+    };
+
+    const historyCopy = whiteboardHistory.slice(0, historyIndex);
+    const newHistory = [...historyCopy, finalAction];
+    setWhiteboardHistory(newHistory);
+    setHistoryIndex(newHistory.length);
+    
+    if (socketRef.current) {
+      socketRef.current.emit('teacher:draw_end', { action: finalAction });
+    }
+    
+    setTextInputPos(null);
+    setTextInputValue('');
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      if (socketRef.current) {
+        socketRef.current.emit('teacher:sync_history', whiteboardHistory.slice(0, newIndex));
+      }
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < whiteboardHistory.length) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      if (socketRef.current) {
+        socketRef.current.emit('teacher:sync_history', whiteboardHistory.slice(0, newIndex));
+      }
+    }
+  };
+
+  const handleClearBoard = () => {
+    setWhiteboardHistory([]);
+    setHistoryIndex(0);
+    if (socketRef.current) {
+      socketRef.current.emit('teacher:clear_canvas');
+    }
+  };
+
+  const handleSendChat = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    const msg = {
+      sender: 'Professor',
+      text: chatInput,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    if (socketRef.current) {
+      socketRef.current.emit('deck:chat_message', { deckUid: deckPin, message: msg });
+    }
+    setChatInput('');
+  };
+
+  const handleResolveDoubt = (doubtId) => {
+    if (socketRef.current) {
+      socketRef.current.emit('deck:resolve_doubt', { deckUid: deckPin, doubtId });
+    }
+  };
+
+  useEffect(() => {
+    if (isLive && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const container = canvas.parentElement;
+      canvas.width = container.clientWidth;
+      canvas.height = Math.max(container.clientHeight, 450);
+      redrawCanvas();
+    }
+  }, [isLive]);
+
+  if (!isLive) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 border border-white/[0.08] bg-[#070b09]/40 backdrop-blur-xl rounded-3xl text-center space-y-6 max-w-2xl mx-auto my-12 relative overflow-hidden shadow-[0_20px_50px_rgba(16,185,129,0.05)]">
+        <div className="absolute top-[-200px] left-[-200px] w-[500px] h-[500px] rounded-full bg-emerald-500/[0.02] blur-[100px] pointer-events-none" />
+        <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.15)] relative z-10 animate-pulse">
+          <HiOutlineStatusOnline size={40} />
+        </div>
+        <div className="space-y-2.5 relative z-10">
+          <h2 className="text-2xl sm:text-3xl font-black text-white font-space tracking-tight">Interactive Flight Deck</h2>
+          <p className="text-sm text-gray-400 leading-relaxed max-w-md mx-auto font-semibold">
+            Start a live whiteboard class session. Draw structures, explain concepts, chat in real-time, and solve student doubts instantly.
+          </p>
+        </div>
+        <button
+          onClick={handleStartDeck}
+          className="py-3.5 px-8 bg-gradient-to-r from-emerald-500 to-green-400 hover:from-emerald-400 hover:to-green-300 text-black text-xs sm:text-sm font-black uppercase tracking-wider rounded-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer shadow-[0_4px_20px_rgba(16,185,129,0.3)] relative z-10"
+        >
+          Start Live Flight Deck
+        </button>
+      </div>
+    );
   }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col space-y-6 w-full"
+      className="flex flex-col space-y-6 w-full h-[calc(100vh-120px)]"
     >
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT PANEL: Whiteboard / Presentation (7 columns) */}
-        <div className="lg:col-span-7 flex flex-col space-y-4">
-          {/* Workspace Toolbar */}
-          <div className="border border-white/[0.08] bg-white/[0.02] p-4 rounded-2xl flex items-center justify-between shadow-lg">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setActiveMode('presentation')}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold font-space transition-all duration-300 ${
-                  activeMode === 'presentation'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/35'
-                    : 'text-gray-400 hover:text-white border border-transparent hover:bg-white/[0.03]'
-                }`}
-              >
-                Lecture Slides
-              </button>
-              <button
-                onClick={() => setActiveMode('whiteboard')}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold font-space transition-all duration-300 ${
-                  activeMode === 'whiteboard'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/35'
-                    : 'text-gray-400 hover:text-white border border-transparent hover:bg-white/[0.03]'
-                }`}
-              >
-                Interactive Canvas
-              </button>
-            </div>
-
-            {/* Whiteboard Color & Clear Controls */}
-            {activeMode === 'whiteboard' && (
-              <div className="flex items-center gap-3.5">
-                <div className="flex items-center gap-1.5 bg-[#0a0f0c] p-1.5 rounded-lg border border-white/[0.05]">
-                  {['#10b981', '#3b82f6', '#ef4444', '#ffffff'].map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => setBrushColor(color)}
-                      style={{ backgroundColor: color }}
-                      className={`w-6 h-6 rounded-full border transition-transform ${
-                        brushColor === color ? 'border-white scale-110 shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'border-transparent hover:scale-105'
-                      }`}
-                    />
-                  ))}
-                </div>
-                
-                {/* One Click Feature Push Button */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1 min-h-0">
+        
+        {/* LEFT COLUMN: Synced Interactive Whiteboard (8 Columns) */}
+        <div className="lg:col-span-8 flex flex-col min-h-0 relative">
+          <div className="border border-white/[0.08] bg-[#050907]/95 rounded-2xl flex-1 relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] flex flex-col min-h-0">
+            {/* 1. Centered Floating Toolbar Overlay */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-black/85 border border-white/[0.08] p-1.5 rounded-xl shadow-2xl backdrop-blur-md">
+              {[
+                { id: 'select', label: 'Selection', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 7.827 5.34-2.508 1.157-1.378 1.16-.39 4.21Z" /></svg> },
+                { id: 'pencil', label: 'Pencil (Freehand)', icon: <HiOutlinePencil size={16} /> },
+                { id: 'line', label: 'Line', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="19" x2="19" y2="5" /></svg> },
+                { id: 'arrow', label: 'Arrow', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25 21 12m0 0-3.75 3.75M21 12H3" /></svg> },
+                { id: 'rect', label: 'Rectangle', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="1" /></svg> },
+                { id: 'diamond', label: 'Diamond', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3L21 12L12 21L3 12Z" /></svg> },
+                { id: 'circle', label: 'Circle', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" /></svg> },
+                { id: 'text', label: 'Text', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 7V4H20V7M12 4V20M9 20H15" /></svg> },
+                { id: 'eraser', label: 'Eraser', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 20H7L3 16C2 15 2 13 3 12L13 2C14 1 16 1 17 2L21 6C22 7 22 9 21 10L14 17L18 20" /></svg> }
+              ].map(t => (
                 <button
-                  onClick={() => pushWorksheetToClass('Whiteboard Canvas', 'Whiteboard Interactive Worksheet')}
-                  className="px-3.5 py-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold font-space flex items-center gap-1.5 transition-all"
-                  title="Push whiteboard to all student screens"
-                >
-                  <HiOutlineSparkles size={14} />
-                  <span>Push to Class</span>
-                </button>
-
-                <button
-                  onClick={clearCanvas}
-                  className="p-2 rounded-lg border border-red-500/20 bg-red-500/5 hover:bg-red-500/15 text-red-400 transition-colors"
-                  title="Clear Board"
-                >
-                  <HiOutlineTrash size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Live Presentation screen or Canvas drawing container */}
-          <div className="border border-white/[0.08] bg-[#050907]/90 rounded-2xl h-[520px] relative overflow-hidden flex flex-col justify-between shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
-            {activeMode === 'presentation' && (
-              deployedMaterial ? (
-                /* display deployed workflow or diagram */
-                <div className="flex-1 flex flex-col justify-between relative animate-fadeIn h-full bg-[#0a0f0c] p-5 text-gray-200">
-                  <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 mb-4 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-space uppercase">
-                        {deployedMaterial.type === 'lesson' ? 'Lesson Plan' : 'Visual Aid'} Deployed
-                      </span>
-                      <h4 className="text-sm font-extrabold text-white font-space truncate max-w-[200px] sm:max-w-md">{deployedMaterial.title}</h4>
-                    </div>
-                    <button
-                      onClick={() => setDeployedMaterial(null)}
-                      className="px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/5 text-[10px] text-red-400 hover:bg-red-500/10 transition-colors font-bold font-space"
-                    >
-                      Clear Material
-                    </button>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto custom-sidebar-scroll pr-1 select-text space-y-4 font-sans text-sm">
-                    {deployedMaterial.type === 'lesson' ? (
-                      /* Render Lesson workflow */
-                      <div className="space-y-4">
-                        <div className="flex flex-wrap gap-2 text-[10px] font-bold font-space uppercase">
-                          {deployedMaterial.subject && (
-                            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
-                              Subject: {deployedMaterial.subject}
-                            </span>
-                          )}
-                          {deployedMaterial.grade && (
-                            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
-                              Grade: {deployedMaterial.grade}
-                            </span>
-                          )}
-                          {deployedMaterial.duration && (
-                            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
-                              Duration: {deployedMaterial.duration} Mins
-                            </span>
-                          )}
-                        </div>
-
-                        {deployedMaterial.objectives && (
-                          <div className="bg-white/[0.02] border border-white/[0.04] p-3 rounded-xl text-left">
-                            <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-space mb-1">Learning Objectives</h5>
-                            <p className="text-xs text-gray-300 font-medium leading-relaxed">{deployedMaterial.objectives}</p>
-                          </div>
-                        )}
-
-                        {deployedMaterial.content.map((sec, idx) => (
-                          <div key={idx} className="bg-white/[0.02] border border-white/[0.04] p-4 rounded-xl space-y-2">
-                            <div className="flex justify-between items-center text-xs font-bold font-space border-b border-white/[0.04] pb-1.5">
-                              <span className="text-emerald-400">{sec.time}</span>
-                              <span className="text-gray-400 uppercase tracking-wider text-[10px]">{sec.phase}</span>
-                            </div>
-                            <h5 className="font-bold text-white text-sm">{sec.title}</h5>
-                            <p className="text-xs text-gray-400 font-medium leading-relaxed">{sec.desc}</p>
-                            {sec.interactive && (
-                              <div className="mt-2.5 p-2.5 bg-emerald-500/5 border border-emerald-500/20 rounded-lg text-[11px] text-emerald-300 font-semibold flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                <span>Interactive Element: {sec.interactive}</span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      /* Render Diagram */
-                      <div className="flex flex-col h-full items-center justify-center space-y-6 py-6">
-                        <div className="flex flex-wrap gap-4 justify-center items-center max-w-lg w-full">
-                          {deployedMaterial.content.nodes.map((node, nIdx) => (
-                            <div key={nIdx} className="flex items-center gap-3">
-                              <div className="p-4 bg-[#0d1310] border border-emerald-500/30 rounded-xl shadow-lg flex flex-col items-center justify-center min-w-[120px] text-center">
-                                <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-black font-space">{node.type}</span>
-                                <span className="text-xs text-white font-extrabold mt-1.5">{node.label}</span>
-                              </div>
-                              {nIdx < deployedMaterial.content.nodes.length - 1 && (
-                                <span className="text-emerald-500 font-bold text-lg">→</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        {deployedMaterial.content.chartData && (
-                          <div className="w-full max-w-md bg-white/[0.02] border border-white/[0.05] rounded-xl p-4 space-y-3">
-                            <h5 className="text-xs font-bold font-space uppercase text-gray-400 text-center">Interactive Graph Data</h5>
-                            <div className="space-y-2">
-                              {deployedMaterial.content.chartData.map((d, dIdx) => (
-                                <div key={dIdx} className="space-y-1">
-                                  <div className="flex justify-between text-[11px] text-gray-300 font-semibold">
-                                    <span>{d.label}</span>
-                                    <span>{d.value}%</span>
-                                  </div>
-                                  <div className="w-full bg-[#18231d] h-2 rounded-full overflow-hidden">
-                                    <div className="bg-emerald-400 h-full" style={{ width: `${d.value}%` }} />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : pdfUrl ? (
-                /* presentation screen with actual PDF viewer */
-                <div className="flex-1 flex flex-col justify-between relative animate-fadeIn h-full">
-                  {/* PDF Viewer Header Toolbar */}
-                  <div className="bg-[#0b100d] border-b border-white/[0.08] px-5 py-3 flex items-center justify-between text-xs text-gray-300 font-sans select-none shrink-0">
-                    <div className="flex items-center gap-3">
-                      {/* Red PDF Icon */}
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" strokeWidth="2.5">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      <span className="font-extrabold font-space truncate max-w-[150px] sm:max-w-xs text-white">{pdfName}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => {
-                          URL.revokeObjectURL(pdfUrl);
-                          setPdfUrl(null);
-                          setPdfName('');
-                        }}
-                        className="px-3 py-1.5 rounded-lg border border-red-500/20 bg-red-500/5 text-[10px] text-red-400 hover:bg-red-500/10 transition-colors font-bold font-space"
-                      >
-                        Clear PDF
-                      </button>
-                      <span className="text-[9px] font-black tracking-widest text-[var(--color-emerald-500)] bg-[var(--color-emerald-500)]/10 px-2.5 py-1 rounded uppercase font-space border border-[var(--color-emerald-500)]/20">
-                        Live View
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* PDF Document Viewport (Actual Iframe) */}
-                  <div className="flex-1 w-full bg-[#181c19] overflow-hidden h-full">
-                    <iframe 
-                      src={pdfUrl} 
-                      className="w-full h-full border-none bg-white" 
-                      title="Lecture PDF Document"
-                    />
-                  </div>
-                </div>
-              ) : (
-                /* drag & drop PDF zone inside LECTURE SLIDES */
-                <div 
-                  onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-                  onDragLeave={() => setIsDragOver(false)}
-                  onDrop={handlePdfDrop}
-                  onClick={() => fileInputRef.current.click()}
-                  className={`flex-1 flex flex-col items-center justify-center p-8 text-center cursor-pointer transition-all duration-300 border-2 border-dashed m-6 rounded-2xl ${
-                    isDragOver 
-                      ? 'border-emerald-400 bg-emerald-500/5' 
-                      : 'border-[#2b312e] bg-[#181c19] hover:bg-[#1b1f1c]'
+                  key={t.id}
+                  onClick={() => { setTool(t.id); setTextInputPos(null); }}
+                  title={t.label}
+                  className={`p-2.5 rounded-lg transition-all duration-200 cursor-pointer ${
+                    tool === t.id
+                      ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(16,185,129,0.3)] font-extrabold scale-105'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handlePdfChange} 
-                    accept=".pdf"
-                    className="hidden" 
-                  />
-                  {isUploading ? (
-                    <div className="flex flex-col items-center space-y-4">
-                      <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin" />
-                      <p className="text-xs sm:text-sm font-space font-extrabold text-emerald-400 uppercase tracking-widest animate-pulse">
-                        Loading PDF document...
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center space-y-4">
-                      <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                        <HiOutlineCloudUpload size={28} />
-                      </div>
-                      <div className="space-y-2 max-w-md">
-                        <h3 className="text-xl font-bold font-space text-white tracking-tight">Drag & Drop Lecture PDF</h3>
-                        <p className="text-xs sm:text-sm text-gray-400 leading-relaxed font-semibold">
-                          Drop your presentation PDF directly here to display it as-is.
-                        </p>
-                      </div>
-                      <span className="text-xs text-[#525d57] font-semibold">
-                        Click to browse files (PDF only)
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )
-            )}
+                  {t.icon}
+                </button>
+              ))}
+            </div>
 
-            {activeMode === 'whiteboard' && (
-              /* interactive board canvas */
-              <div className="flex-1 w-full h-full relative cursor-crosshair overflow-hidden animate-fadeIn">
-                <canvas
-                  ref={canvasRef}
-                  onMouseDown={startDrawing}
-                  onMouseMove={draw}
-                  onMouseUp={stopDrawing}
-                  onMouseLeave={stopDrawing}
-                  className="absolute inset-0 block w-full h-full"
-                />
-                <div className="absolute bottom-4 right-4 pointer-events-none bg-black/40 border border-white/[0.06] backdrop-blur-md px-3.5 py-2 rounded-xl text-xs text-gray-400 font-semibold flex items-center gap-2">
-                  <HiOutlinePencil className="text-emerald-400" size={14} />
-                  <span>Draw directly here</span>
+            {/* 2. Left Configuration Sidebar Panel Overlay */}
+            {tool !== 'select' && tool !== 'eraser' && (
+              <div className="absolute top-20 left-4 z-20 flex flex-col gap-4 bg-black/85 border border-white/[0.08] p-4 rounded-xl shadow-2xl backdrop-blur-md w-56 text-xs max-h-[75%] overflow-y-auto custom-sidebar-scroll animate-fadeIn">
+                {/* Stroke Color selection */}
+                <div className="space-y-2">
+                  <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Stroke Color</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['#10b981', '#3b82f6', '#ef4444', '#f59e0b', '#ffffff', '#000000'].map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setBrushColor(c)}
+                        style={{ backgroundColor: c }}
+                        className={`w-5.5 h-5.5 rounded border transition-all duration-150 cursor-pointer ${
+                          brushColor === c ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'
+                        }`}
+                      />
+                    ))}
+                  </div>
                 </div>
+
+                {/* Fill Color selection */}
+                {tool !== 'pencil' && tool !== 'text' && (
+                  <div className="space-y-2">
+                    <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Background Fill</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['transparent', 'rgba(16,185,129,0.15)', 'rgba(59,130,246,0.15)', 'rgba(239,68,68,0.15)', 'rgba(245,158,11,0.15)', 'rgba(255,255,255,0.15)'].map(c => (
+                        <button
+                          key={c}
+                          onClick={() => setFillColor(c)}
+                          style={{ backgroundColor: c === 'transparent' ? 'transparent' : c }}
+                          className={`w-5.5 h-5.5 rounded border transition-all duration-150 cursor-pointer flex items-center justify-center ${
+                            fillColor === c ? 'border-white scale-110 shadow-md' : 'border-transparent hover:scale-105'
+                          } ${c === 'transparent' ? 'border-white/[0.2] bg-[linear-gradient(45deg,transparent_45%,#fff_45%,#fff_55%,transparent_55%)]' : ''}`}
+                        >
+                          {c === 'transparent' && <span className="text-[10px] text-gray-500 font-bold">✖</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Stroke Width selection */}
+                <div className="space-y-2">
+                  <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Stroke Width</span>
+                  <div className="flex gap-2">
+                    {[
+                      { id: 2, label: 'Thin' },
+                      { id: 4, label: 'Medium' },
+                      { id: 8, label: 'Bold' }
+                    ].map(w => (
+                      <button
+                        key={w.id}
+                        onClick={() => setBrushWidth(w.id)}
+                        className={`flex-1 py-1.5 rounded text-[10px] border font-black transition-all cursor-pointer ${
+                          brushWidth === w.id
+                            ? 'bg-emerald-500 text-black border-emerald-500'
+                            : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {w.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Opacity selection */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase">
+                    <span>Opacity</span>
+                    <span className="text-emerald-400 font-mono font-black">{opacity}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    step="10"
+                    value={opacity}
+                    onChange={(e) => setOpacity(parseInt(e.target.value, 10))}
+                    className="w-full accent-emerald-500 cursor-pointer"
+                  />
+                </div>
+
+                {/* Text Tool Configurations */}
+                {tool === 'text' && (
+                  <div className="space-y-3 pt-2 border-t border-white/[0.08] animate-fadeIn">
+                    <div className="space-y-1.5">
+                      <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Font Family</span>
+                      <div className="flex gap-1.5">
+                        {[
+                          { id: 'sans-serif', label: 'Sans' },
+                          { id: 'mono', label: 'Mono' },
+                          { id: 'handdrawn', label: 'Hand' }
+                        ].map(f => (
+                          <button
+                            key={f.id}
+                            onClick={() => setFontFamily(f.id)}
+                            className={`flex-1 py-1 rounded text-[9px] border font-bold transition-all cursor-pointer ${
+                              fontFamily === f.id
+                                ? 'bg-emerald-500 text-black border-emerald-500 font-black'
+                                : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Font Size</span>
+                      <div className="flex gap-1">
+                        {[
+                          { id: 2, label: 'S' },
+                          { id: 4, label: 'M' },
+                          { id: 6, label: 'L' },
+                          { id: 9, label: 'XL' }
+                        ].map(s => (
+                          <button
+                            key={s.id}
+                            onClick={() => setFontSize(s.id)}
+                            className={`w-7 h-7 rounded border font-black text-[10px] flex items-center justify-center transition-all cursor-pointer ${
+                              fontSize === s.id
+                                ? 'bg-emerald-500 text-black border-emerald-500'
+                                : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Alignment</span>
+                      <div className="flex gap-1.5">
+                        {[
+                          { id: 'left', label: 'Left', icon: '⫷' },
+                          { id: 'center', label: 'Center', icon: '⫸' },
+                          { id: 'right', label: 'Right', icon: '⫵' }
+                        ].map(a => (
+                          <button
+                            key={a.id}
+                            onClick={() => setTextAlign(a.id)}
+                            className={`flex-1 py-1 rounded text-[9px] border font-bold transition-all cursor-pointer ${
+                              textAlign === a.id
+                                ? 'bg-emerald-500 text-black border-emerald-500 font-black'
+                                : 'bg-transparent text-gray-400 border-white/[0.08] hover:text-white'
+                            }`}
+                            title={a.label}
+                          >
+                            {a.icon}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
+
+            {/* 3. Main Drawing Interactive Canvas */}
+            <div className="flex-1 w-full h-full relative cursor-crosshair overflow-hidden select-none">
+              <canvas
+                ref={canvasRef}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onTouchStart={handleMouseDown}
+                onTouchMove={handleMouseMove}
+                onTouchEnd={handleMouseUp}
+                className="absolute inset-0 block w-full h-full"
+              />
+              
+              <div className="absolute bottom-4 left-4 pointer-events-none bg-black/50 border border-white/[0.06] backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] text-gray-400 font-semibold flex items-center gap-1.5 shadow-md">
+                <HiOutlinePencil className="text-emerald-400" size={12} />
+                <span>{tool === 'text' ? 'Click canvas to type text' : tool === 'select' ? 'Click and drag items to move' : `Drawing with ${tool}`}</span>
+              </div>
+
+              {textInputPos && (
+                <div
+                  className="absolute z-30 flex items-center bg-black/80 p-2 rounded-xl border border-emerald-500/30 shadow-2xl"
+                  style={{ top: textInputPos.y - 15, left: textInputPos.x - 10 }}
+                >
+                  <input
+                    type="text"
+                    value={textInputValue}
+                    onChange={(e) => setTextInputValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleTextCommit();
+                      if (e.key === 'Escape') setTextInputPos(null);
+                    }}
+                    placeholder="Type and press Enter..."
+                    className="bg-transparent text-white text-xs outline-none border-none px-1 py-0.5 w-44 font-sans focus:ring-0"
+                    autoFocus
+                    onBlur={handleTextCommit}
+                  />
+                  <button
+                    onClick={handleTextCommit}
+                    className="ml-1 px-2 py-0.5 bg-emerald-500 text-black font-bold text-[10px] rounded"
+                  >
+                    OK
+                  </button>
+                </div>
+              )}
+
+              {/* 4. Bottom Right floating zoom controls and clear button */}
+              <div className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 bg-black/85 border border-white/[0.08] p-1.5 rounded-xl shadow-2xl backdrop-blur-md">
+                <button
+                  onClick={handleUndo}
+                  disabled={historyIndex <= 0}
+                  className="p-2 bg-black/40 border border-white/[0.06] rounded-lg text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Undo"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
+                </button>
+                <button
+                  onClick={handleRedo}
+                  disabled={historyIndex >= whiteboardHistory.length}
+                  className="p-2 bg-black/40 border border-white/[0.06] rounded-lg text-gray-300 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5 transition-colors cursor-pointer"
+                  title="Redo"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" /></svg>
+                </button>
+                <div className="w-px h-5 bg-white/[0.08] mx-0.5" />
+                <button
+                  onClick={handleClearBoard}
+                  className="p-2 bg-red-950/15 border border-red-500/20 hover:border-red-500/40 hover:bg-red-950/35 text-red-400 rounded-lg transition-all duration-200 cursor-pointer"
+                  title="Clear whiteboard"
+                >
+                  <HiOutlineTrash size={14} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* RIGHT PANEL: Seating Grid & Workspace Inspector (5 columns) */}
-        <div className="lg:col-span-5 flex flex-col space-y-5">
-          {/* Seating Grid Card */}
-          <div className="border border-white/[0.04] bg-[#0c0d0d] p-5 rounded-2xl shadow-xl flex flex-col space-y-4">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-white font-space">Interactive Seating Grid</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Drag & drop desks to swap students. Click to inspect.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const name = prompt("Enter Student's Full Name:")
-                  if (!name) return
-                  const email = prompt("Enter Student's Email:")
-                  if (!email) return
-                  handleAddStudent(name, email)
-                }}
-                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold rounded-lg transition-colors font-space shrink-0 cursor-pointer"
-              >
-                + Add Student
-              </button>
+        {/* RIGHT COLUMN: Sidebar (Joined Students, Doubts, Chat) (4 Columns) */}
+        <div className="lg:col-span-4 flex flex-col space-y-4 min-h-0 max-h-full">
+          <div className="border border-white/[0.08] bg-[#070b09]/90 p-4 rounded-2xl shadow-lg shrink-0 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
+              <span className="text-xs font-black uppercase text-emerald-400 tracking-wider font-space">Live Flight Deck</span>
             </div>
+            {deckPin && (
+              <div className="px-3.5 py-1.5 rounded-xl text-xs font-black font-space border bg-[#061810] text-emerald-400 border-emerald-500/30 flex items-center gap-2 shadow-md">
+                <HiOutlineKey className="text-emerald-500" />
+                <span>PIN: {deckPin}</span>
+              </div>
+            )}
+          </div>
 
-            {/* Room Desk Grid */}
-            <div className="grid grid-cols-3 gap-3">
-              {Array.from({ length: 4 }).map((_, rIdx) =>
-                Array.from({ length: 3 }).map((_, cIdx) => {
-                  const student = getStudentAt(rIdx, cIdx)
-                  if (student) {
-                    const isSelected = selectedStudentId === student.id
-                    const hasDoubt = student.doubt !== null
-                    const isDistracted = student.status === 'distracted'
-
-                    let borderStyle = 'border-white/[0.08] bg-white/[0.02]'
-                    let glowStyle = ''
-                    if (hasDoubt) {
-                      borderStyle = 'border-rose-500/40 bg-rose-950/20'
-                      glowStyle = 'shadow-[0_0_12px_rgba(244,63,94,0.25)] animate-pulse'
-                    } else if (isDistracted) {
-                      borderStyle = 'border-amber-500/30 bg-amber-950/10'
-                      glowStyle = 'shadow-[0_0_10px_rgba(245,158,11,0.15)]'
-                    } else if (isSelected) {
-                      borderStyle = 'border-emerald-500 bg-emerald-950/20'
-                      glowStyle = 'shadow-[0_0_12px_rgba(16,185,129,0.3)]'
-                    } else {
-                      borderStyle = 'border-white/[0.08] hover:border-emerald-500/40 hover:bg-white/[0.04]'
-                    }
-
-                    return (
-                      <div
-                        key={student.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, student.id)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, rIdx, cIdx)}
-                        onClick={() => setSelectedStudentId(student.id)}
-                        className={`p-3 rounded-xl border ${borderStyle} ${glowStyle} flex flex-col justify-between h-24 cursor-pointer select-none transition-all duration-300 relative group`}
-                      >
-                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-40 transition-opacity text-gray-500 cursor-grab">
-                          <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M7 2a2 2 0 11-2-2 2 2 0 012 2zm6 0a2 2 0 11-2-2 2 2 0 012 2zm-6 6a2 2 0 11-2-2 2 2 0 012 2zm6 0a2 2 0 11-2-2 2 2 0 012 2zm-6 6a2 2 0 11-2-2 2 2 0 012 2zm6 0a2 2 0 11-2-2 2 2 0 012 2z" />
-                          </svg>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <div className={`w-6 h-6 rounded text-[10px] font-black flex items-center justify-center ${
-                            hasDoubt 
-                              ? 'bg-rose-500/20 text-rose-400' 
-                              : isDistracted 
-                                ? 'bg-amber-500/20 text-amber-400' 
-                                : 'bg-emerald-500/20 text-emerald-400'
-                          }`}>
-                            {student.name.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-white truncate leading-none">{student.name.split(' ')[0]}</p>
-                            <p className="text-[9px] text-gray-500 truncate mt-1">{student.status === 'focused' ? 'Focused' : 'Idle'}</p>
-                          </div>
-                        </div>
-
-                        <div className="mt-1">
-                          <p className="text-[8px] text-gray-400 truncate font-semibold">
-                            {student.currentProgress}
-                          </p>
-                        </div>
-
-                        {hasDoubt && (
-                          <span className="absolute bottom-2 right-2 w-3.5 h-3.5 rounded-full bg-rose-500 flex items-center justify-center text-[9px] text-black font-black animate-bounce">
-                            !
-                          </span>
-                        )}
+          <div className="border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-0 shrink-0">
+            <div className="flex justify-between items-center pb-2.5 border-b border-white/[0.06]">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space flex items-center gap-2">
+                <span>Joined Students</span>
+                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.2 rounded font-mono text-[10px]">{joinedStudents.length}</span>
+              </h4>
+            </div>
+            
+            <div className="mt-3 overflow-y-auto max-h-[140px] pr-1 space-y-2 custom-sidebar-scroll">
+              {joinedStudents.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-[10px] text-gray-500 italic">Waiting for students to join using PIN...</p>
+                </div>
+              ) : (
+                joinedStudents.map((student, idx) => (
+                  <div key={idx} className="bg-white/[0.02] border border-white/[0.04] p-2 rounded-xl flex items-center justify-between transition-colors hover:bg-white/[0.04]">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-[10px] text-emerald-400 font-extrabold font-space">
+                        {student.name.split(' ').map(n => n[0]).join('')}
                       </div>
-                    )
-                  } else {
-                    return (
-                      <div
-                        key={`empty-${rIdx}-${cIdx}`}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, rIdx, cIdx)}
-                        className="border border-dashed border-white/[0.04] bg-transparent rounded-xl h-24 flex items-center justify-center text-[9px] text-gray-600 font-semibold"
-                      >
-                        Empty
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white truncate leading-none">{student.name}</p>
+                        <p className="text-[9px] text-gray-500 truncate mt-1">{student.uid || student.email}</p>
                       </div>
-                    )
-                  }
-                })
+                    </div>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  </div>
+                ))
               )}
             </div>
           </div>
 
-          {/* Workstation Inspector */}
-          <div className="border border-white/[0.04] bg-[#0c0d0d] p-5 rounded-2xl shadow-xl min-h-[190px] flex flex-col justify-between">
-            {selectedStudent ? (
-              <div className="animate-fadeIn flex flex-col h-full justify-between space-y-4">
-                <div className="space-y-3.5">
-                  <div className="flex justify-between items-start border-b border-white/[0.06] pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 font-bold text-sm">
-                        {selectedStudent.name.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-white font-space leading-tight">{selectedStudent.name}</h4>
-                        <p className="text-[10px] text-gray-400">Desk: Row {selectedStudent.row + 1}, Col {selectedStudent.col + 1}</p>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => setSelectedStudentId(null)}
-                      className="text-gray-500 hover:text-white transition-colors"
-                    >
-                      <HiOutlineX size={14} />
-                    </button>
-                  </div>
+          <div className="border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-0 flex-1">
+            <div className="flex justify-between items-center pb-2.5 border-b border-white/[0.06] shrink-0">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space flex items-center gap-2">
+                <span>Doubt Inbox</span>
+                {doubts.length > 0 && (
+                  <span className="bg-rose-500/15 text-rose-400 border border-rose-500/30 px-1.5 py-0.2 rounded font-mono text-[10px] animate-pulse">{doubts.length}</span>
+                )}
+              </h4>
+            </div>
 
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="bg-white/[0.02] border border-white/[0.04] p-2.5 rounded-xl">
-                      <p className="text-[9px] text-gray-500 uppercase font-black tracking-wider font-space">Workspace Activity</p>
-                      <p className="text-white font-bold mt-1 truncate">{selectedStudent.currentProgress}</p>
-                    </div>
-                    <div className="bg-white/[0.02] border border-white/[0.04] p-2.5 rounded-xl">
-                      <p className="text-[9px] text-gray-500 uppercase font-black tracking-wider font-space">Submission Status</p>
-                      <p className={`font-bold mt-1 ${
-                        selectedStudent.assignmentStatus.includes('Graded') 
-                          ? 'text-emerald-400' 
-                          : selectedStudent.assignmentStatus.includes('Pending') 
-                            ? 'text-amber-400' 
-                            : 'text-gray-300'
-                      }`}>{selectedStudent.assignmentStatus}</p>
-                    </div>
-                  </div>
-
-                  {selectedStudent.grade && selectedStudent.grade !== 'N/A' && (
-                    <div className="bg-emerald-950/10 border border-emerald-500/20 p-2.5 rounded-xl text-xs space-y-1">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[9px] text-emerald-400 uppercase font-black tracking-wider font-space">Grade Book Score</span>
-                        <span className="text-emerald-400 font-extrabold">{selectedStudent.grade}</span>
-                      </div>
-                      {selectedStudent.aiFeedback && (
-                        <p className="text-[10px] text-gray-300 leading-normal italic font-semibold">
-                          AI: "{selectedStudent.aiFeedback}"
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {selectedStudent.doubt && (
-                    <div className="p-3 bg-rose-500/5 border border-rose-500/25 text-rose-300 rounded-xl text-xs flex justify-between items-center animate-pulse">
-                      <div className="flex items-center gap-2">
-                        <HiOutlineHand className="text-rose-400 flex-shrink-0 animate-bounce" size={16} />
-                        <div>
-                          <p className="font-bold text-white leading-none">Doubt Raised</p>
-                          <p className="text-[10px] text-rose-300/80 mt-1 font-medium">"{selectedStudent.doubt}"</p>
-                        </div>
-                      </div>
+            <div className="mt-3 overflow-y-auto flex-1 pr-1 space-y-2.5 custom-sidebar-scroll">
+              {doubts.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center py-6">
+                  <svg className="w-8 h-8 text-[#262d29] mb-1.5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+                  <p className="text-[10px] text-gray-500 font-semibold">No doubts raised yet.</p>
+                </div>
+              ) : (
+                doubts.map((doubt) => (
+                  <div key={doubt.id} className="p-3 bg-rose-500/5 border border-rose-500/20 text-rose-300 rounded-xl text-xs space-y-2 flex flex-col animate-fadeIn">
+                    <div className="flex justify-between items-center border-b border-white/[0.04] pb-1.5 shrink-0">
+                      <span className="font-extrabold text-white">{doubt.studentName}</span>
                       <button
-                        onClick={() => handleResolveDoubt(selectedStudent.id)}
-                        className="px-2 py-1 bg-rose-500/15 border border-rose-500/35 hover:bg-rose-500/25 rounded-md text-[10px] text-rose-400 font-bold transition-all"
+                        onClick={() => handleResolveDoubt(doubt.id)}
+                        className="px-2 py-0.5 bg-rose-500/15 border border-rose-500/35 hover:bg-rose-500/25 rounded text-[9px] text-rose-400 font-bold transition-all cursor-pointer"
                       >
                         Resolve
                       </button>
                     </div>
-                  )}
-                </div>
-
-                <div className="flex gap-2 border-t border-white/[0.06] pt-3">
-                  <button
-                    onClick={() => {
-                      alert(`Extension challenge pushed to ${selectedStudent.name}'s workstation!`);
-                    }}
-                    className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 py-2 rounded-xl text-xs font-bold font-space transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <HiOutlineSparkles size={13} />
-                    <span>Push Challenge</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="my-auto text-center flex flex-col items-center justify-center space-y-2 py-4">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#262d29" strokeWidth="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
-                </svg>
-                <div>
-                  <p className="text-xs font-space text-gray-400 font-bold">Workstation Inspector</p>
-                  <p className="text-[10px] text-gray-500 font-semibold mt-0.5">Select a student's desk to monitor live details.</p>
-                </div>
-              </div>
-            )}
+                    <p className="text-[11px] text-gray-300 leading-normal italic font-semibold select-text">
+                      "{doubt.text}"
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
+
+          <div className="border border-white/[0.08] bg-[#070b09]/80 p-4 rounded-2xl flex flex-col min-h-[220px] max-h-[300px] shrink-0">
+            <div className="flex items-center justify-between pb-2 border-b border-white/[0.06] shrink-0">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider font-space">Synced Room Chat</h4>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2.5 my-3 pr-1 text-[11px] custom-sidebar-scroll">
+              {chatMessages.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-gray-500 text-[10px] italic">
+                  Class chatroom is empty. Say hello!
+                </div>
+              ) : (
+                chatMessages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex flex-col max-w-[85%] rounded-xl px-3 py-2 border ${
+                      msg.sender === 'Professor'
+                        ? 'bg-emerald-500/10 border-emerald-500/25 text-white ml-auto text-right'
+                        : 'bg-white/[0.04] border-white/[0.08] text-gray-200 mr-auto text-left'
+                    }`}
+                  >
+                    <span className="text-[8px] font-bold text-gray-500">{msg.sender} • {msg.timestamp}</span>
+                    <p className="mt-0.5 font-semibold leading-relaxed select-text">{msg.text}</p>
+                  </div>
+                ))
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <form onSubmit={handleSendChat} className="flex gap-2 shrink-0">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Message classroom..."
+                className="flex-1 bg-black/60 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+              />
+              <button
+                type="submit"
+                className="px-3 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl font-bold flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <HiOutlineChat size={14} />
+              </button>
+            </form>
+          </div>
+
         </div>
       </div>
     </motion.div>
-  )
+  );
 }
 
 /* ── INTERACTIVE PAPER DIGITIZER WORKSPACE ── */
@@ -1914,7 +2445,8 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
     const newPages = files.map(file => ({
       name: file.name,
       size: (file.size / 1024).toFixed(1) + ' KB',
-      id: Date.now() + Math.random()
+      id: Date.now() + Math.random(),
+      file: file
     }))
     setUploadedPages(prev => [...prev, ...newPages])
   }
@@ -1924,84 +2456,125 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
     setDigitizedResult(null)
   }
 
-  const runDigitization = () => {
+  const runDigitization = async () => {
+    if (uploadedPages.length === 0) return
     setIsDigitizing(true)
-    setTimeout(() => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      const token = info.token
+
+      const formData = new FormData()
+      formData.append('file', uploadedPages[0].file)
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/grader/digitize`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.message || 'Digitization failed')
+      }
+
+      const data = await res.json()
+      setDigitizedResult(data)
+      showToast('Document digitized successfully!', 'success')
+      if (onAssetCreated) onAssetCreated()
+    } catch (error) {
+      console.error(error)
+      showToast(error.message || 'Failed to digitize document', 'error')
+    } finally {
+      setIsDigitizing(false)
+    }
+  }
+
+  const runCameraScan = async () => {
+    if (isScanning) return
+    setIsScanning(true)
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      const token = info.token
+
+      const canvas = document.createElement('canvas')
+      canvas.width = 10
+      canvas.height = 10
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = 'rgba(0,0,0,0)'
+      ctx.fillRect(0, 0, 10, 10)
+      
+      const fileBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg'))
+      const dummyFile = new File([fileBlob], 'scan.jpg', { type: 'image/jpeg' })
+
+      const formData = new FormData()
+      formData.append('file', dummyFile)
+      formData.append('studentId', selectedStudentId)
+      formData.append('title', 'AI Handwritten Homework Grading')
+      formData.append('rubric', 'Verify completeness, factual accuracy, clear explanations, and structure.')
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/grader/grade`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.message || 'AI Grading failed')
+      }
+
+      const data = await res.json()
+
+      const studentObj = students.find(s => s.id === selectedStudentId)
       setDigitizedResult({
         type: 'grade',
-        title: 'INGESTED QUESTION PAPER - MATH 101',
-        subtitle: 'Processed via Acharya AI OCR engine',
-        score: '20/25',
-        studentName: 'General Ingestion',
-        feedback: 'Calculus steps solved correctly. Minor limit normalization issue in Section A.',
+        score: data.evaluation.score,
+        studentName: studentObj ? studentObj.name : 'Unknown Student',
+        feedback: data.evaluation.feedback,
+        title: 'AI Graded Homework',
+        subtitle: `Graded assignment: AI Handwritten Homework Grading`,
         sections: [
           {
-            title: 'Section A: Calculus Foundations',
-            questions: [
-              'Q1. Evaluate the limit: lim(x -> 0) [sin(5x) / 2x]. (3 Marks)',
-              'Q2. Find the derivative of f(x) = e^(3x^2 - 5x + 2). (4 Marks)',
-              'Q3. Compute the integral of x^3 ln(x) dx using integration by parts. (5 Marks)'
-            ]
+            title: 'Rubric Analysis',
+            questions: [data.evaluation.rubricAnalysis]
+          },
+          {
+            title: 'Extracted OCR Text',
+            questions: [data.evaluation.extractedText]
           }
         ]
       })
-      setIsDigitizing(false)
-      if (onAssetCreated) onAssetCreated()
-    }, 2000)
-  }
 
-  const runCameraScan = () => {
-    if (isScanning) return
-    setIsScanning(true)
-    const targetStudent = students.find(s => s.id === selectedStudentId)
-    setTimeout(() => {
-      const scores = ['18/25', '21/25', '23/25', '25/25', '22/25']
-      const feedChoices = [
-        'Demonstrated excellent understanding of differentiation rules. The chain rule application is perfect.',
-        'Good calculus proofs, but integration by parts was left incomplete at the final substitution step.',
-        'Perfect score! All matrices solved, eigenvalues correct, and calculus derivations are completely correct.',
-        'Minor algebraic error in Section A limit formulation. The final answer should be 5/2, not 5.'
-      ]
-      
-      const chosenScore = scores[Math.floor(Math.random() * scores.length)]
-      const chosenFeedback = feedChoices[Math.floor(Math.random() * feedChoices.length)]
-
-      // Update student grade in global state
       setStudents(prev => prev.map(s => {
         if (s.id === selectedStudentId) {
           return {
             ...s,
-            assignmentStatus: `Submitted (Graded - ${chosenScore})`,
-            grade: chosenScore,
-            aiFeedback: chosenFeedback,
-            status: 'focused'
+            grade: `${data.evaluation.score}/100`,
+            assignmentStatus: 'Completed',
+            aiFeedback: data.evaluation.feedback
           }
         }
         return s
       }))
 
-      setDigitizedResult({
-        type: 'grade',
-        title: `GRADED NOTEBOOK: ${targetStudent ? targetStudent.name.toUpperCase() : 'STUDENT'}`,
-        subtitle: 'OCR Handwritten Grader Output',
-        score: chosenScore,
-        studentName: targetStudent ? targetStudent.name : 'Selected Student',
-        feedback: chosenFeedback,
-        sections: [
-          {
-            title: 'Section A: Student Solutions Ingested',
-            questions: [
-              'Ingested: lim(x->0) [sin(5x) / 2x] = 5/2. -> Correct.',
-              'Ingested: f\'(x) = d/dx [e^(3x^2-5x+2)] = (6x-5)e^(3x^2-5x+2). -> Correct.',
-              'Ingested: Integral x^3 ln(x) dx. -> Partially Complete.'
-            ]
-          }
-        ]
-      })
-      setIsScanning(false)
-      showToast(`Marks (${chosenScore}) filled in Gradebook for ${targetStudent ? targetStudent.name : 'student'}!`, 'success')
+      showToast('Homework graded successfully by AI!', 'success')
       if (onAssetCreated) onAssetCreated()
-    }, 2500)
+    } catch (error) {
+      console.error(error)
+      showToast(error.message || 'Failed to grade homework', 'error')
+    } finally {
+      setIsScanning(false)
+    }
   }
 
   return (
@@ -2316,7 +2889,7 @@ function PaperDigitizer({ uploadedPages, setUploadedPages, digitizedResult, setD
 }
 
 /* ── MATH HELPER WORKSPACE ── */
-export function MathHelper({ pushWorksheetToClass, onProblemSolved }) {
+export function MathHelper({ pushWorksheetToClass, onProblemSolved, showToast }) {
   const [problem, setProblem] = useState('')
   const [selectedTopic, setSelectedTopic] = useState('Calculus')
   const [solutionSteps, setSolutionSteps] = useState(null)
@@ -2332,22 +2905,43 @@ export function MathHelper({ pushWorksheetToClass, onProblemSolved }) {
     ]
   }
 
-  const handleSolve = () => {
+  const handleSolve = async () => {
     if (!problem.trim()) return
     setIsSolving(true)
-    setTimeout(() => {
-      let steps = ["Step 1: Parse the input equation.", "Step 2: Recognize variables and operators.", "Step 3: Apply relevant mathematical theorems.", "Step 4: Simplify output expression."]
-      
-      const allSamples = [...sampleProblems.Calculus, ...sampleProblems.Algebra]
-      const found = allSamples.find(s => s.q.toLowerCase().includes(problem.toLowerCase()) || problem.toLowerCase().includes(s.q.toLowerCase()))
-      if (found) {
-        steps = found.ans
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      const token = info.token
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/grader/solve-math`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          problem,
+          topic: selectedTopic
+        })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.message || 'Math Solver failed')
       }
-      
-      setSolutionSteps(steps)
-      setIsSolving(false)
+
+      const data = await res.json()
+      setSolutionSteps(data.solutionSteps || [])
+      showToast('Problem solved successfully!', 'success')
       if (onProblemSolved) onProblemSolved()
-    }, 1500)
+    } catch (error) {
+      console.error(error)
+      showToast(error.message || 'Failed to solve problem', 'error')
+    } finally {
+      setIsSolving(false)
+    }
   }
 
   return (
@@ -2636,27 +3230,46 @@ export function LessonPlanner({ setDeployedMaterial, setActiveTab, showToast, on
     }
   }
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!topic.trim()) return
     setIsGenerating(true)
-    setTimeout(() => {
-      setLessonPlan({
-        title: `Lesson Plan: ${topic}`,
-        subject: subject,
-        grade: grade,
-        duration: duration,
-        objectives: learningObjectives || 'Understand core conceptual models and interactive exercises.',
-        workflow: [
-          { time: '0m - 10m', phase: 'Introduction', title: 'Hook & Context Setting', desc: `Introduce ${topic} in ${subject} class. Check prerequisite knowledge.`, interactive: 'Raise Hand check' },
-          { time: '10m - 25m', phase: 'Core Concept', title: 'Direct Instruction', desc: `Present the primary concepts of ${topic}. Highlight formulas and definitions. Objective: ${learningObjectives || 'Understand core theories'}.`, interactive: 'Whiteboard drawing comparison' },
-          { time: '25m - 35m', phase: 'Active Check', title: 'Interactive Poll', desc: `Run a live class poll to gauge student understanding of the core concept.`, interactive: 'Active understanding check poll' },
-          { time: '35m - 45m', phase: 'Guided Practice', title: 'Student Workstations', desc: `Push an interactive worksheet to all student desks. Monitor live progress in seating grid.`, interactive: 'One-click challenge worksheet' }
-        ]
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      const token = info.token
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/lessons/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          grade,
+          subject,
+          topic,
+          duration,
+          objectives: learningObjectives
+        })
       })
-      setIsGenerating(false)
-      showToast('AI Lesson Plan generated successfully!', 'success')
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.message || 'Lesson Plan generation failed')
+      }
+
+      const data = await res.json()
+      setLessonPlan(data)
+      showToast('Lesson plan generated successfully!', 'success')
       if (onPlanGenerated) onPlanGenerated()
-    }, 2000)
+    } catch (error) {
+      console.error(error)
+      showToast(error.message || 'Failed to generate lesson plan', 'error')
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   const handleDeploy = () => {
@@ -2853,41 +3466,43 @@ export function VisualAids({ setDeployedMaterial, setActiveTab, showToast, onAid
   const [isGenerating, setIsGenerating] = useState(false)
   const [visualAid, setVisualAid] = useState(null)
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!prompt.trim()) return
     setIsGenerating(true)
-    setTimeout(() => {
-      if (aidType === 'diagram') {
-        setVisualAid({
-          title: `Diagram: ${prompt}`,
-          type: 'diagram',
-          data: {
-            nodes: [
-              { label: 'Input Data', type: 'Source' },
-              { label: 'Feature Extraction', type: 'Process' },
-              { label: 'CNN Weights', type: 'Model' },
-              { label: 'Prediction Output', type: 'Result' }
-            ]
-          }
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      const token = info.token
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/grader/visual-aid`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          prompt,
+          type: aidType
         })
-      } else {
-        setVisualAid({
-          title: `Chart: ${prompt}`,
-          type: 'chart',
-          data: {
-            nodes: [{ label: 'Performance', type: 'Metric' }],
-            chartData: [
-              { label: 'Focused students', value: 80 },
-              { label: 'Tabbed out', value: 15 },
-              { label: 'Doubt raising', value: 5 }
-            ]
-          }
-        })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.message || 'Visual Aid generation failed')
       }
-      setIsGenerating(false)
-      showToast('Visual aid successfully generated!', 'success')
+
+      const data = await res.json()
+      setVisualAid(data)
+      showToast('Visual Aid generated successfully!', 'success')
       if (onAidGenerated) onAidGenerated()
-    }, 2000)
+    } catch (error) {
+      console.error(error)
+      showToast(error.message || 'Failed to generate visual aid', 'error')
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   const handleDeploy = () => {
@@ -3221,24 +3836,28 @@ export function SupportView({ showToast }) {
   )
 }
 
-export function ProfileView({ userEmail, userName, showToast, totalTopics = 0, assetsCreated = 0, totalStudents = 12, weeklyActivity = 0, onEditRedirect, setActiveTab }) {
+export function ProfileView({ 
+  userEmail, 
+  userName, 
+  showToast, 
+  totalTopics = 0, 
+  assetsCreated = 0, 
+  totalStudents = 12, 
+  weeklyActivity = 0, 
+  onEditRedirect, 
+  setActiveTab,
+  subjectsTaught = '',
+  experience = '',
+  qualification = '',
+  aboutMe = 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.',
+  memberSince = '',
+}) {
   const profileImage = localStorage.getItem('profile_image') || null
   const coverImage = localStorage.getItem('profile_cover') || null
   const profileName = localStorage.getItem('profile_name') || userName || userEmail
   
   const schoolName = localStorage.getItem('profile_schoolName') || ''
-  const subjectsTaught = localStorage.getItem('profile_subjectsTaught') || ''
-  const experience = localStorage.getItem('profile_experience') || ''
-  const qualification = localStorage.getItem('profile_qualification') || ''
-  const memberSince = localStorage.getItem('profile_memberSince') || (() => {
-    const date = new Date()
-    const day = String(date.getDate()).padStart(2, '0')
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const year = date.getFullYear()
-    return `${day}/${month}/${year}`
-  })()
-  const aboutMe = localStorage.getItem('profile_aboutMe') || 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.'
-
+  
   const usedAiToolsCount = (() => {
     try {
       const list = JSON.parse(localStorage.getItem('used_ai_tools') || '[]')
@@ -3506,25 +4125,42 @@ export function ProfileView({ userEmail, userName, showToast, totalTopics = 0, a
   )
 }
 
-export function EditProfileForm({ userEmail, userName, setUserName, showToast }) {
-  const [profileImage, setProfileImage] = useState(() => localStorage.getItem('profile_image') || null)
+export function EditProfileForm({ 
+  userEmail, 
+  userName, 
+  setUserName, 
+  showToast,
+  subjectsTaught: parentSubjectsTaught,
+  setSubjectsTaught: setParentSubjectsTaught,
+  experience: parentExperience,
+  setExperience: setParentExperience,
+  qualification: parentQualification,
+  setQualification: setParentQualification,
+  aboutMe: parentAboutMe,
+  setAboutMe: setParentAboutMe,
+  memberSince: parentMemberSince,
+  setMemberSince: setParentMemberSince,
+  userPicture,
+  setUserPicture
+}) {
+  const [profileImage, setProfileImage] = useState(() => localStorage.getItem('profile_image') || userPicture || null)
   const [coverImage, setCoverImage] = useState(() => localStorage.getItem('profile_cover') || null)
   const profileInputRef = useRef(null)
   const coverInputRef = useRef(null)
   
   const [fullName, setFullName] = useState(() => localStorage.getItem('profile_name') || userName || '')
   const [schoolName, setSchoolName] = useState(() => localStorage.getItem('profile_schoolName') || '')
-  const [subjectsTaught, setSubjectsTaught] = useState(() => localStorage.getItem('profile_subjectsTaught') || '')
-  const [experience, setExperience] = useState(() => localStorage.getItem('profile_experience') || '')
-  const [qualification, setQualification] = useState(() => localStorage.getItem('profile_qualification') || '')
-  const [memberSince, setMemberSince] = useState(() => localStorage.getItem('profile_memberSince') || (() => {
+  const [subjectsTaught, setSubjectsTaught] = useState(parentSubjectsTaught)
+  const [experience, setExperience] = useState(parentExperience)
+  const [qualification, setQualification] = useState(parentQualification)
+  const [memberSince, setMemberSince] = useState(parentMemberSince || (() => {
     const date = new Date()
     const day = String(date.getDate()).padStart(2, '0')
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const year = date.getFullYear()
     return `${day}/${month}/${year}`
   })())
-  const [aboutMe, setAboutMe] = useState(() => localStorage.getItem('profile_aboutMe') || 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.')
+  const [aboutMe, setAboutMe] = useState(parentAboutMe || 'Dedicated and passionate educator with a focus on creating engaging and effective learning environments. Experienced in teaching various subjects. Committed to leveraging AI technology to enhance teaching efficiency and student outcomes.')
 
   const handleFileClick = (type) => {
     if (type === 'profile' && profileInputRef.current) {
@@ -3553,18 +4189,55 @@ export function EditProfileForm({ userEmail, userName, setUserName, showToast })
     }
   }
 
-  const handleSaveProfile = () => {
-    localStorage.setItem('profile_name', fullName)
-    localStorage.setItem('profile_schoolName', schoolName)
-    localStorage.setItem('profile_subjectsTaught', subjectsTaught)
-    localStorage.setItem('profile_experience', experience)
-    localStorage.setItem('profile_qualification', qualification)
-    localStorage.setItem('profile_memberSince', memberSince)
-    localStorage.setItem('profile_aboutMe', aboutMe)
-    if (setUserName) {
-      setUserName(fullName)
+  const handleSaveProfile = async () => {
+    try {
+      const savedInfo = localStorage.getItem('userInfo')
+      if (!savedInfo) return
+      const info = JSON.parse(savedInfo)
+      if (!info.token) return
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await fetch(`${API_URL}/api/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${info.token}`
+        },
+        body: JSON.stringify({
+          name: fullName,
+          picture: profileImage,
+          subjectsTaught,
+          experience,
+          qualification,
+          aboutMe
+        })
+      })
+
+      if (res.ok) {
+        localStorage.setItem('profile_name', fullName)
+        localStorage.setItem('profile_schoolName', schoolName)
+        localStorage.setItem('profile_subjectsTaught', subjectsTaught)
+        localStorage.setItem('profile_experience', experience)
+        localStorage.setItem('profile_qualification', qualification)
+        localStorage.setItem('profile_memberSince', memberSince)
+        localStorage.setItem('profile_aboutMe', aboutMe)
+        
+        if (setUserName) setUserName(fullName)
+        if (setParentSubjectsTaught) setParentSubjectsTaught(subjectsTaught)
+        if (setParentExperience) setParentExperience(experience)
+        if (setParentQualification) setParentQualification(qualification)
+        if (setParentAboutMe) setParentAboutMe(aboutMe)
+        if (setParentMemberSince) setParentMemberSince(memberSince)
+        if (setUserPicture && profileImage) setUserPicture(profileImage)
+
+        showToast('Profile updated successfully!', 'success')
+      } else {
+        showToast('Failed to update profile.', 'error')
+      }
+    } catch (err) {
+      console.error(err)
+      showToast('Failed to update profile due to connection error.', 'error')
     }
-    showToast('Profile updated successfully!', 'success')
   }
 
   return (
@@ -3766,7 +4439,19 @@ export function SettingsView({
   currentTab,
   setCurrentTab,
   totalTopics,
-  assetsCreated
+  assetsCreated,
+  subjectsTaught,
+  setSubjectsTaught,
+  experience,
+  setExperience,
+  qualification,
+  setQualification,
+  aboutMe,
+  setAboutMe,
+  memberSince,
+  setMemberSince,
+  userPicture,
+  setUserPicture
 }) {
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -3850,6 +4535,18 @@ export function SettingsView({
             userEmail={userEmail}
             userName={userName}
             setUserName={setUserName}
+            subjectsTaught={subjectsTaught}
+            setSubjectsTaught={setSubjectsTaught}
+            experience={experience}
+            setExperience={setExperience}
+            qualification={qualification}
+            setQualification={setQualification}
+            aboutMe={aboutMe}
+            setAboutMe={setAboutMe}
+            memberSince={memberSince}
+            setMemberSince={setMemberSince}
+            userPicture={userPicture}
+            setUserPicture={setUserPicture}
           />
         )}
 
@@ -4333,6 +5030,247 @@ export function SettingsView({
       </div>
     </motion.div>
   )
+}
+
+export function BranchingCourseCreator({ showToast, onCourseCreated }) {
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [chapters, setChapters] = useState([
+    {
+      chapterTitle: 'Chapter 1: Foundations',
+      mainVideoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+      quizQuestion: 'Supervised learning works with what kind of data?',
+      quizOptions: ['Labeled Data', 'Unlabeled Data', 'Simulated Environment Data', 'Feedback Reward Data'],
+      quizCorrectIndex: 0,
+      advancedVideoUrl: 'https://www.w3schools.com/html/movie.mp4',
+      remedialVideoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    }
+  ]);
+
+  const handleAddChapter = () => {
+    setChapters([...chapters, {
+      chapterTitle: `Chapter ${chapters.length + 1}: Topic Name`,
+      mainVideoUrl: '',
+      quizQuestion: '',
+      quizOptions: ['', '', '', ''],
+      quizCorrectIndex: 0,
+      advancedVideoUrl: '',
+      remedialVideoUrl: '',
+    }]);
+  };
+
+  const handleChapterChange = (index, field, value) => {
+    const updated = [...chapters];
+    updated[index][field] = value;
+    setChapters(updated);
+  };
+
+  const handleOptionChange = (chIdx, optIdx, val) => {
+    const updated = [...chapters];
+    updated[chIdx].quizOptions[optIdx] = val;
+    setChapters(updated);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!title) {
+      showToast('Course Title is required', 'error');
+      return;
+    }
+
+    try {
+      const savedInfo = localStorage.getItem('userInfo');
+      if (!savedInfo) return;
+      const info = JSON.parse(savedInfo);
+      if (!info.token) return;
+
+      const res = await fetch(`${API_URL}/api/courses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${info.token}`
+        },
+        body: JSON.stringify({ title, description, chapters })
+      });
+
+      if (res.ok) {
+        showToast('Adaptive Branching Course Published Successfully!', 'success');
+        setTitle('');
+        setDescription('');
+        setChapters([
+          {
+            chapterTitle: 'Chapter 1: Foundations',
+            mainVideoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+            quizQuestion: 'Supervised learning works with what kind of data?',
+            quizOptions: ['Labeled Data', 'Unlabeled Data', 'Simulated Environment Data', 'Feedback Reward Data'],
+            quizCorrectIndex: 0,
+            advancedVideoUrl: 'https://www.w3schools.com/html/movie.mp4',
+            remedialVideoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+          }
+        ]);
+        if (onCourseCreated) onCourseCreated();
+      } else {
+        const err = await res.json();
+        showToast(err.message || 'Failed to publish course', 'error');
+      }
+    } catch (err) {
+      showToast('Error publishing branching course', 'error');
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-6 bg-[#070b09]/50 border border-white/[0.08] rounded-3xl space-y-6"
+    >
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-black text-white font-space">Branching Course Creator (Teacher Panel)</h2>
+          <p className="text-xs text-gray-400 mt-1">Design an adaptive syllabus with seamless branching based on student micro-quizzes.</p>
+        </div>
+        <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-md text-[10px] font-bold uppercase font-space">
+          Adaptive Engine
+        </span>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6 text-xs font-semibold">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-gray-400">Course Syllabus Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Applied Neural Networks"
+              className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-gray-400">Brief Description</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Multi-path curriculum using micro-quizzes"
+              className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex justify-between items-center border-t border-white/[0.08] pt-4">
+            <h3 className="text-sm font-extrabold text-white font-space">Course Chapters ({chapters.length})</h3>
+            <button
+              type="button"
+              onClick={handleAddChapter}
+              className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/35 hover:bg-emerald-500/25 text-emerald-400 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+            >
+              + Add Chapter Node
+            </button>
+          </div>
+
+          {chapters.map((ch, chIdx) => (
+            <div key={chIdx} className="bg-white/[0.02] border border-white/[0.06] p-5 rounded-2xl space-y-4 relative">
+              <div className="flex justify-between items-center">
+                <input
+                  type="text"
+                  value={ch.chapterTitle}
+                  onChange={(e) => handleChapterChange(chIdx, 'chapterTitle', e.target.value)}
+                  className="bg-transparent border-b border-white/10 font-bold text-white text-xs focus:outline-none focus:border-emerald-500 w-1/2 py-0.5"
+                />
+                <span className="text-[10px] text-gray-500 font-space">Node #{chIdx + 1}</span>
+              </div>
+
+              {/* Videos Row */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-gray-500">Main Video Link (Standard Path)</label>
+                  <input
+                    type="text"
+                    value={ch.mainVideoUrl}
+                    onChange={(e) => handleChapterChange(chIdx, 'mainVideoUrl', e.target.value)}
+                    placeholder="https://example.com/video.mp4"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-gray-500 text-emerald-400">Advanced Video Link (Correct Path)</label>
+                  <input
+                    type="text"
+                    value={ch.advancedVideoUrl}
+                    onChange={(e) => handleChapterChange(chIdx, 'advancedVideoUrl', e.target.value)}
+                    placeholder="https://example.com/advanced.mp4"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-gray-500 text-orange-400">Remedial Video Link (Incorrect Path)</label>
+                  <input
+                    type="text"
+                    value={ch.remedialVideoUrl}
+                    onChange={(e) => handleChapterChange(chIdx, 'remedialVideoUrl', e.target.value)}
+                    placeholder="https://example.com/remedial.mp4"
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Quiz Settings */}
+              <div className="border-t border-white/[0.04] pt-4 space-y-3">
+                <div className="space-y-1">
+                  <label className="text-gray-500">Micro-Quiz Question Popup</label>
+                  <input
+                    type="text"
+                    value={ch.quizQuestion}
+                    onChange={(e) => handleChapterChange(chIdx, 'quizQuestion', e.target.value)}
+                    placeholder="Ask a quick verification question..."
+                    className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    required
+                  />
+                </div>
+
+                {/* Options and correct index selection */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {ch.quizOptions.map((opt, optIdx) => (
+                    <div key={optIdx} className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name={`correct-${chIdx}`}
+                        checked={ch.quizCorrectIndex === optIdx}
+                        onChange={() => handleChapterChange(chIdx, 'quizCorrectIndex', optIdx)}
+                        className="accent-emerald-500 shrink-0"
+                      />
+                      <input
+                        type="text"
+                        value={opt}
+                        onChange={(e) => handleOptionChange(chIdx, optIdx, e.target.value)}
+                        placeholder={`Option ${optIdx + 1}`}
+                        className="w-full bg-black/60 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          type="submit"
+          className="w-full py-4 bg-gradient-to-r from-emerald-500 to-green-400 text-black text-xs font-black uppercase tracking-wider rounded-2xl hover:scale-[1.01] transition-transform cursor-pointer"
+        >
+          Publish Adaptive Branching Course
+        </button>
+      </form>
+    </motion.div>
+  );
 }
 
 

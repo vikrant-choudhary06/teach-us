@@ -3,7 +3,33 @@ import User from '../models/User.js';
 import Attendance from '../models/Attendance.js';
 import Gradebook from '../models/Gradebook.js';
 
+export const addStudentByUid = async (req, res) => {
+  const { uid, classroom } = req.body;
+  try {
+    const user = await User.findOne({ uid, role: 'Student' });
+    if (!user) {
+      return res.status(404).json({ message: 'Student with this UID not found' });
+    }
 
+    // Check if student is already in teacher's roster
+    const existing = await Student.findOne({ email: user.email, teacherId: req.user._id });
+    if (existing) {
+      return res.status(400).json({ message: 'Student is already in your class' });
+    }
+
+    const student = await Student.create({
+      name: user.name,
+      email: user.email,
+      parentId: null, 
+      teacherId: req.user._id,
+      classroom: classroom || 'General',
+    });
+
+    res.status(201).json(student);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 
 export const createStudent = async (req, res) => {
@@ -126,6 +152,35 @@ export const getStudentStats = async (req, res) => {
       grades,
       attendanceLogs,
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const updateStudent = async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    if (student.teacherId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to update this student' });
+    }
+
+    const { row, col, status, assignmentStatus, currentProgress, doubt, grade, aiFeedback } = req.body;
+
+    if (row !== undefined) student.row = row;
+    if (col !== undefined) student.col = col;
+    if (status !== undefined) student.status = status;
+    if (assignmentStatus !== undefined) student.assignmentStatus = assignmentStatus;
+    if (currentProgress !== undefined) student.currentProgress = currentProgress;
+    if (doubt !== undefined) student.doubt = doubt;
+    if (grade !== undefined) student.grade = grade;
+    if (aiFeedback !== undefined) student.aiFeedback = aiFeedback;
+
+    const updated = await student.save();
+    res.json(updated);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
