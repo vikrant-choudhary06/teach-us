@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
+import { io } from 'socket.io-client'
 import {
   HiOutlineHome,
   HiOutlineFolder,
@@ -45,6 +46,16 @@ import {
 } from 'react-icons/hi'
 
 export default function Dashboard() {
+  const socketRef = useRef(null)
+
+  useEffect(() => {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    socketRef.current = io(API_URL)
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect()
+    }
+  }, [])
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const email = localStorage.getItem('userEmail')
     if (email && email !== 'educator@acharya.ai') {
@@ -215,6 +226,12 @@ export default function Dashboard() {
       currentProgress: `Solving: ${contentSummary}`,
       status: 'focused',
     })))
+    
+    // Broadcast material to students via sockets
+    if (socketRef.current && deployedMaterial) {
+      socketRef.current.emit('teacher:push_material', deployedMaterial);
+    }
+    
     showToast(`Worksheet from "${sourceName}" pushed to all ${students.length} student workstations!`, 'success')
   }
 
@@ -422,6 +439,10 @@ export default function Dashboard() {
       if (res.ok) {
         const newStudent = await res.json()
         showToast(`Student "${name}" enrolled successfully!`, 'success')
+        
+        if (socketRef.current) {
+          socketRef.current.emit('teacher:add_student', newStudent)
+        }
         
         // Fetch updated student list
         const reRes = await fetch(`${API_URL}/api/students`, {

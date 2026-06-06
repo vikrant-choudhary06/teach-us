@@ -225,6 +225,19 @@ export const initSocket = (server) => {
       }
     });
 
+    // ── LIVE FLIGHT DECK SYNC ──
+    socket.on('teacher:push_material', (material) => {
+      // Broadcast material to all students
+      io.emit('student:receive_material', material);
+      console.log(`[Socket] Teacher pushed material: ${material?.title || 'Unknown'}`);
+    });
+
+    socket.on('teacher:add_student', (student) => {
+      // Notify that a student was added to the flight deck
+      io.emit('student:added_to_flight_deck', student);
+      console.log(`[Socket] Teacher added student to flight deck: ${student?.name || 'Unknown'}`);
+    });
+
 
     socket.on('hand:raise', () => {
       const { classroomId, userId, userName } = socket;

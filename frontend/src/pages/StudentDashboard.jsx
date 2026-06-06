@@ -115,6 +115,9 @@ export default function StudentDashboard() {
   const [activeInvite, setActiveInvite] = useState(null)
   const [inviteTimer, setInviteTimer] = useState(15)
 
+  // Live Class / Flight Deck Sync state
+  const [liveMaterial, setLiveMaterial] = useState(null)
+
   // Synced drawing board states
   const canvasRef = useRef(null)
   const [isDrawing, setIsDrawing] = useState(false)
@@ -253,6 +256,19 @@ export default function StudentDashboard() {
 
     socketRef.current.on('coop:complete_mission', () => {
       triggerVictory()
+    })
+
+    socketRef.current.on('student:receive_material', (material) => {
+      setLiveMaterial(material)
+      setActiveTab('live-class')
+      alert('Professor has pushed new material to the Live Class!')
+    })
+
+    socketRef.current.on('student:added_to_flight_deck', (student) => {
+      // Show notification if it's us
+      if (student.email === userEmail) {
+        alert('You have been added to the Professor\\'s Live Flight Deck!')
+      }
     })
 
     return () => {
@@ -704,6 +720,18 @@ export default function StudentDashboard() {
           >
             <HiOutlineStatusOnline size={18} className="mr-2 text-emerald-400" />
             {!isSidebarCollapsed && <span>Co-Op Study Rooms</span>}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('live-class')}
+            className={`w-full flex items-center rounded-xl text-left text-sm font-bold tracking-wide font-space transition-all duration-300 py-3 px-3.5 ${
+              activeTab === 'live-class'
+                ? 'text-white bg-gradient-to-r from-emerald-500/20 to-green-500/10 border border-emerald-500/40 shadow-[0_4px_12px_rgba(16,185,129,0.1)]'
+                : 'text-gray-300 hover:text-white hover:bg-white/[0.04]'
+            }`}
+          >
+            <HiOutlineSparkles size={18} className="mr-2 text-emerald-400" />
+            {!isSidebarCollapsed && <span>Live Class</span>}
           </button>
         </nav>
 
@@ -1373,6 +1401,92 @@ export default function StudentDashboard() {
                     </button>
                   </div>
                 )}
+              </motion.div>
+            )}
+            {activeTab === 'live-class' && (
+              <motion.div
+                key="live-class"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                className="space-y-6"
+              >
+                <div className="relative rounded-3xl border border-white/[0.08] p-8 bg-gradient-to-r from-[#061209] to-[#040806] overflow-hidden shadow-2xl min-h-[500px]">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-64 bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none" />
+                  
+                  <div className="flex items-center justify-between mb-8 relative z-10 border-b border-white/[0.05] pb-6">
+                    <div>
+                      <h2 className="text-2xl font-black text-white font-space flex items-center gap-3">
+                        <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
+                        Live Flight Deck
+                      </h2>
+                      <p className="text-sm font-semibold text-gray-400 mt-1">Real-time materials pushed by the Professor.</p>
+                    </div>
+                  </div>
+
+                  <div className="relative z-10 w-full flex flex-col items-center justify-center">
+                    {!liveMaterial ? (
+                      <div className="text-center space-y-4 my-20">
+                        <div className="w-16 h-16 rounded-full bg-[#121a15] border border-white/[0.05] mx-auto flex items-center justify-center">
+                          <HiOutlineSparkles size={28} className="text-emerald-500/50" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-300">Waiting for Professor...</h3>
+                        <p className="text-sm text-gray-500">Materials will appear here automatically when deployed.</p>
+                      </div>
+                    ) : (
+                      <div className="w-full bg-[#080b09]/80 border border-emerald-500/20 p-8 rounded-2xl shadow-[0_8px_30px_rgba(16,185,129,0.08)] backdrop-blur-md">
+                        <div className="mb-8 border-b border-white/[0.05] pb-4">
+                          <h3 className="text-xl font-extrabold text-white font-space">{liveMaterial.title}</h3>
+                          <p className="text-xs text-emerald-400 uppercase tracking-widest mt-1 font-bold">Interactive {liveMaterial.type}</p>
+                        </div>
+                        
+                        {liveMaterial.type === 'diagram' && liveMaterial.content && liveMaterial.content.nodes ? (
+                          <div className="flex flex-col md:flex-row items-center justify-center gap-4 py-10">
+                            {liveMaterial.content.nodes.map((node, idx) => (
+                              <div key={idx} className="flex items-center gap-4">
+                                <motion.div 
+                                  initial={{ scale: 0.8, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  transition={{ delay: idx * 0.15 }}
+                                  className="px-6 py-4 bg-emerald-950/30 border border-emerald-500/40 rounded-xl text-center min-w-[140px] shadow-[0_0_20px_rgba(16,185,129,0.15)]"
+                                >
+                                  <p className="text-[10px] text-emerald-400 uppercase font-black font-space tracking-wider">{node.type}</p>
+                                  <p className="text-sm text-white font-bold mt-1.5">{node.label}</p>
+                                </motion.div>
+                                {idx < liveMaterial.content.nodes.length - 1 && (
+                                  <span className="text-emerald-500/60 font-black hidden md:inline">→</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : liveMaterial.type === 'chart' && liveMaterial.content && liveMaterial.content.chartData ? (
+                          <div className="w-full max-w-lg mx-auto space-y-5 py-6">
+                            {liveMaterial.content.chartData.map((item, idx) => (
+                              <div key={idx} className="space-y-1.5">
+                                <div className="flex justify-between text-sm text-gray-200 font-bold">
+                                  <span>{item.label}</span>
+                                  <span className="text-emerald-400">{item.value}%</span>
+                                </div>
+                                <div className="w-full bg-[#121614] h-3.5 rounded-full overflow-hidden border border-white/[0.04]">
+                                  <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${item.value}%` }}
+                                    transition={{ duration: 1, delay: idx * 0.1, ease: 'easeOut' }}
+                                    className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-full shadow-[0_0_12px_rgba(16,185,129,0.6)]" 
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center p-10">
+                            <p className="text-gray-300 font-mono text-sm break-words whitespace-pre-wrap">{JSON.stringify(liveMaterial.content, null, 2)}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
