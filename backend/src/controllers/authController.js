@@ -207,6 +207,13 @@ export const googleLogin = async (req, res) => {
     let user = await User.findOne({ $or: [{ googleId }, { email }] });
 
     if (user) {
+      // Strict Role Verification (Option 1 enhancement)
+      if (role && user.role !== role) {
+        return res.status(403).json({ 
+          message: `Access Denied: This account is already registered as a ${user.role}. Please select the ${user.role} portal to login.` 
+        });
+      }
+
       // If user exists by email but googleId is not linked, link it
       let updated = false;
       if (!user.googleId) {
