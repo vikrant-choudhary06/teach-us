@@ -88,7 +88,7 @@ export default function PricingSection() {
             >
               Annually
             </span>
-            <span className="bg-brand-forest/10 text-brand-forest border border-brand-forest/20 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+            <span className="bg-[var(--color-emerald-500)]/15 text-[var(--color-emerald-500)] border border-[var(--color-emerald-500)]/25 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
               20% OFF
             </span>
           </div>
@@ -109,7 +109,7 @@ export default function PricingSection() {
               className="pointer-events-none absolute -inset-px transition-opacity duration-300"
               style={{
                 opacity: hoveredCardIndex === 0 ? 1 : 0,
-                background: `radial-gradient(400px circle at ${coords.x}px ${coords.y}px, rgba(15, 45, 36, 0.02), transparent 80%)`,
+                background: `radial-gradient(400px circle at ${coords.x}px ${coords.y}px, rgba(var(--theme-spotlight-color, 16, 185, 129), 0.05), transparent 80%)`,
               }}
             />
 
@@ -163,17 +163,17 @@ export default function PricingSection() {
             onMouseMove={(e) => handleMouseMove(e, 1)}
             onMouseEnter={() => setHoveredCardIndex(1)}
             onMouseLeave={() => setHoveredCardIndex(null)}
-            className="relative rounded-[2rem] border border-brand-forest/15 bg-white p-8 flex flex-col h-full transition-all duration-300 overflow-hidden shadow-md hover:shadow-2xl hover:border-brand-forest/30"
+            className="relative rounded-[2rem] border border-emerald-500/50 bg-[#0d1015]/95 p-8 flex flex-col h-full transition-all duration-300 overflow-hidden theme-glow-shadow"
           >
-            {/* Top highlight line */}
-            <div className="absolute top-0 left-0 right-0 h-[4px] bg-brand-forest" />
+            {/* Top green line glow highlight */}
+            <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-transparent via-[var(--color-emerald-400)] to-transparent" style={{ boxShadow: '0 0 15px var(--color-emerald-400)' }} />
 
             {/* Spotlight */}
             <div
               className="pointer-events-none absolute -inset-px transition-opacity duration-300"
               style={{
                 opacity: hoveredCardIndex === 1 ? 1 : 0,
-                background: `radial-gradient(400px circle at ${coords.x}px ${coords.y}px, rgba(15, 45, 36, 0.03), transparent 80%)`,
+                background: `radial-gradient(400px circle at ${coords.x}px ${coords.y}px, rgba(var(--theme-spotlight-color, 16, 185, 129), 0.07), transparent 80%)`,
               }}
             />
 
@@ -201,7 +201,8 @@ export default function PricingSection() {
             <div className="mb-8 relative z-10">
               <Link
                 to="/login"
-                className="w-full inline-flex items-center justify-center py-3 px-6 rounded-full bg-brand-forest hover:bg-brand-forest-hover text-white font-bold text-xs sm:text-sm transition-all shadow-md shadow-brand-forest/10"
+                className="w-full inline-flex items-center justify-center py-3 px-6 rounded-full bg-[var(--color-emerald-500)] hover:bg-[var(--color-emerald-600)] text-[var(--theme-btn-text,#000000)] font-bold text-xs sm:text-sm transition-all"
+                style={{ boxShadow: '0 4px 25px rgba(var(--theme-spotlight-color, 16, 185, 129), 0.18)' }}
               >
                 Get Pro Membership
               </Link>
@@ -239,7 +240,7 @@ export default function PricingSection() {
               className="pointer-events-none absolute -inset-px transition-opacity duration-300"
               style={{
                 opacity: hoveredCardIndex === 2 ? 1 : 0,
-                background: `radial-gradient(400px circle at ${coords.x}px ${coords.y}px, rgba(15, 45, 36, 0.02), transparent 80%)`,
+                background: `radial-gradient(400px circle at ${coords.x}px ${coords.y}px, rgba(var(--theme-spotlight-color, 16, 185, 129), 0.05), transparent 80%)`,
               }}
             />
 

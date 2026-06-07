@@ -92,7 +92,8 @@ export default function NewsletterSection() {
                 <button
                   type="submit"
                   disabled={status === 'submitting'}
-                  className="bg-brand-forest hover:bg-brand-forest-hover text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-full transition-all shrink-0 shadow-md shadow-brand-forest/10 disabled:opacity-50 select-none cursor-pointer"
+                  className="bg-[var(--color-emerald-500)] hover:bg-[var(--color-emerald-600)] text-[var(--theme-btn-text,#000000)] font-bold text-xs sm:text-sm px-6 py-3 rounded-full transition-all shrink-0 disabled:opacity-50 select-none cursor-pointer"
+                  style={{ boxShadow: '0 2px 15px rgba(var(--theme-spotlight-color, 16, 185, 129), 0.15)' }}
                 >
                   {status === 'submitting' ? 'Subscribing...' : 'Subscribe'}
                 </button>

@@ -1,7 +1,12 @@
 import fs from 'fs';
 import Gradebook from '../models/Gradebook.js';
-import Student from '../models/Student.js';
-import { gradeHomeworkWithAI } from '../services/aiService.js';
+import User from '../models/User.js';
+import { 
+  gradeHomeworkWithAI, 
+  solveMathWithAI, 
+  digitizePaperWithAI, 
+  generateVisualAidWithAI 
+} from '../services/aiService.js';
 
 
 
@@ -21,7 +26,7 @@ export const gradeHomework = async (req, res) => {
 
   try {
 
-    const student = await Student.findById(studentId);
+    const student = await User.findById(studentId);
     if (!student) {
       fs.unlinkSync(req.file.path);
       return res.status(404).json({ message: 'Student not found' });
@@ -68,6 +73,57 @@ export const gradeHomework = async (req, res) => {
       fs.unlinkSync(req.file.path);
     }
     console.error('Grader Controller error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const solveMath = async (req, res) => {
+  const { problem, topic } = req.body;
+
+  if (!problem) {
+    return res.status(400).json({ message: 'Problem expression is required' });
+  }
+
+  try {
+    const solution = await solveMathWithAI(problem, topic);
+    res.json(solution);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const digitizePaper = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'Please upload a notebook/notes image file' });
+  }
+
+  try {
+    const digitized = await digitizePaperWithAI(req.file.path, req.file.mimetype);
+
+    fs.unlink(req.file.path, (err) => {
+      if (err) console.error('Failed to delete temp file:', req.file.path, err);
+    });
+
+    res.json(digitized);
+  } catch (error) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const generateVisualAid = async (req, res) => {
+  const { prompt, type } = req.body;
+
+  if (!prompt || !type) {
+    return res.status(400).json({ message: 'Prompt and type are required' });
+  }
+
+  try {
+    const visualAid = await generateVisualAidWithAI(prompt, type);
+    res.json(visualAid);
+  } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };

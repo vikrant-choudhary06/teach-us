@@ -35,7 +35,7 @@ const BentoCard = ({ children, className = '' }) => {
         <div
           className="pointer-events-none absolute -inset-px transition duration-300 rounded-2xl z-0"
           style={{
-            background: `radial-gradient(280px circle at ${coords.x}px ${coords.y}px, rgba(231, 239, 233, 0.04), transparent 80%)`,
+            background: `radial-gradient(280px circle at ${coords.x}px ${coords.y}px, rgba(var(--theme-spotlight-color, 16, 185, 129), 0.05), transparent 80%)`,
           }}
         />
       )}
@@ -255,7 +255,7 @@ export default function FeaturesSection() {
                     transition={{ duration: 8 - orbitSpeed, repeat: Infinity, ease: 'linear' }}
                     className="absolute w-14 h-14"
                   >
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-brand-sage shadow-[0_0_6px_#E7EFE9]" />
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400)]" />
                   </motion.div>
                 </div>
 
@@ -269,7 +269,7 @@ export default function FeaturesSection() {
                     className="w-full appearance-none cursor-pointer accent-brand-sage"
                     style={{
                       height: '3px',
-                      background: `linear-gradient(to right, #E7EFE9 0%, #E7EFE9 ${((orbitSpeed - 1) / 8) * 100}%, rgba(255,255,255,0.1) ${((orbitSpeed - 1) / 8) * 100}%, rgba(255,255,255,0.1) 100%)`,
+                      background: `linear-gradient(to right, var(--color-emerald-400) 0%, var(--color-emerald-400) ${((orbitSpeed - 1) / 8) * 100}%, rgba(255,255,255,0.1) ${((orbitSpeed - 1) / 8) * 100}%, rgba(255,255,255,0.1) 100%)`,
                       borderRadius: '999px',
                     }}
                   />

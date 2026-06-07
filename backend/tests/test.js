@@ -159,9 +159,8 @@ const runTests = async () => {
       const studentData = await studentRes.json();
       if (!studentRes.ok) throw new Error(`Student creation failed: ${studentData.message}`);
       
-      studentId = studentData._id;
+      studentId = studentData.user._id;
       console.log(`✅ Student created successfully. ID: ${studentId}`);
-      console.log(`✅ Linked Parent ID: ${studentData.parentId}`);
 
 
       const parentUser = await mongoose.connection.db.collection('users').findOne({ email: 'parent.rahul@example.com' });

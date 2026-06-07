@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import Student from '../models/Student.js';
+import StudentProfile from '../models/StudentProfile.js';
 import Attendance from '../models/Attendance.js';
 import Gradebook from '../models/Gradebook.js';
 import User from '../models/User.js';
@@ -9,19 +9,20 @@ import { sendWeeklyParentReport } from '../services/emailService.js';
 export const compileWeeklyReports = async () => {
   console.log('Starting compilation of weekly parent reports...');
   try {
-    const students = await Student.find({}).populate('parentId').populate('teacherId');
-    console.log(`Found ${students.length} students to process.`);
+    const studentProfiles = await StudentProfile.find({}).populate('parentId').populate('user');
+    console.log(`Found ${studentProfiles.length} students to process.`);
 
     let reportsProcessed = 0;
 
-    for (const student of students) {
-      if (!student.parentId || !student.parentId.email) {
-        console.log(`Skipping student ${student.name}: No parent account linked or no email available.`);
+    for (const profile of studentProfiles) {
+      if (!profile.parentId || !profile.parentId.email || !profile.user) {
+        console.log(`Skipping student: No parent account linked or no email available.`);
         continue;
       }
 
-      const parentEmail = student.parentId.email;
-      const parentName = student.parentId.name;
+      const student = profile.user;
+      const parentEmail = profile.parentId.email;
+      const parentName = profile.parentId.name;
 
 
       const oneWeekAgo = new Date();

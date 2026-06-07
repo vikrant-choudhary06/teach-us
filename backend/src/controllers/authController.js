@@ -1,4 +1,6 @@
 import User from '../models/User.js';
+import TeacherProfile from '../models/TeacherProfile.js';
+import StudentProfile from '../models/StudentProfile.js';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import { sendVerificationOTP, sendWelcomeEmail } from '../services/emailService.js';
@@ -65,6 +67,14 @@ export const registerUser = async (req, res) => {
     });
 
     if (user) {
+      if (user.role === 'Teacher') {
+        await TeacherProfile.create({ user: user._id });
+      } else if (user.role === 'Student') {
+        const cleanName = user.name.replace(/\s+/g, '').toUpperCase();
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        await StudentProfile.create({ user: user._id, uid: `${cleanName}#${randomSuffix}` });
+      }
+
       if (!isTestEmail) {
         await sendVerificationOTP(email, name, otp);
       }
@@ -111,11 +121,30 @@ export const loginUser = async (req, res) => {
         });
       }
 
+      let uid = undefined;
+
+      if (user.role === 'Student') {
+        let studentProfile = await StudentProfile.findOne({ user: user._id });
+        if (!studentProfile) {
+          const cleanName = user.name.replace(/\s+/g, '').toUpperCase();
+          const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+          studentProfile = await StudentProfile.create({ user: user._id, uid: `${cleanName}#${randomSuffix}` });
+        } else if (!studentProfile.uid) {
+          const cleanName = user.name.replace(/\s+/g, '').toUpperCase();
+          const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+          studentProfile.uid = `${cleanName}#${randomSuffix}`;
+          await studentProfile.save();
+        }
+        uid = studentProfile.uid;
+      }
+
       res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
+        picture: user.picture,
+        uid: uid,
         token: generateToken(user._id),
       });
     } else {
@@ -133,10 +162,66 @@ export const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     if (user) {
-      res.json(user);
+      const userObj = user.toObject();
+      if (user.role === 'Teacher') {
+        const profile = await TeacherProfile.findOne({ user: user._id });
+        if (profile) Object.assign(userObj, profile.toObject(), { _id: user._id });
+      } else if (user.role === 'Student') {
+        const profile = await StudentProfile.findOne({ user: user._id });
+        if (profile) Object.assign(userObj, profile.toObject(), { _id: user._id });
+      }
+      res.json(userObj);
     } else {
       res.status(404).json({ message: 'User not found' });
     }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const updateUserProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const { name, picture, subjectsTaught, experience, qualification, aboutMe, credits } = req.body;
+
+    if (name !== undefined) user.name = name;
+    if (picture !== undefined) user.picture = picture;
+    const updatedUser = await user.save();
+    
+    let updatedProfile = null;
+    if (user.role === 'Teacher') {
+      let profile = await TeacherProfile.findOne({ user: user._id });
+      if (!profile) profile = new TeacherProfile({ user: user._id });
+      
+      if (subjectsTaught !== undefined) profile.subjectsTaught = subjectsTaught;
+      if (experience !== undefined) profile.experience = experience;
+      if (qualification !== undefined) profile.qualification = qualification;
+      if (aboutMe !== undefined) profile.aboutMe = aboutMe;
+      if (credits !== undefined) profile.credits = credits;
+      
+      updatedProfile = await profile.save();
+    }
+
+    const userObj = updatedUser.toObject();
+    if (updatedProfile) Object.assign(userObj, updatedProfile.toObject(), { _id: user._id });
+
+    res.json({
+      _id: userObj._id,
+      name: userObj.name,
+      email: userObj.email,
+      role: userObj.role,
+      picture: userObj.picture,
+      uid: userObj.uid,
+      subjectsTaught: userObj.subjectsTaught,
+      experience: userObj.experience,
+      qualification: userObj.qualification,
+      aboutMe: userObj.aboutMe,
+      credits: userObj.credits,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -156,12 +241,19 @@ export const googleLogin = async (req, res) => {
     });
 
     const payload = ticket.getPayload();
-    const { sub: googleId, email, name } = payload;
+    const { sub: googleId, email, name, picture } = payload;
 
     // Check if user already exists by googleId or email
     let user = await User.findOne({ $or: [{ googleId }, { email }] });
 
     if (user) {
+      // Strict Role Verification (Option 1 enhancement)
+      if (role && user.role !== role) {
+        return res.status(403).json({ 
+          message: `Access Denied: This account is already registered as a ${user.role}. Please select the ${user.role} portal to login.` 
+        });
+      }
+
       // If user exists by email but googleId is not linked, link it
       let updated = false;
       if (!user.googleId) {
@@ -171,6 +263,25 @@ export const googleLogin = async (req, res) => {
       if (!user.isVerified) {
         user.isVerified = true;
         updated = true;
+      }
+      if (picture && user.picture !== picture) {
+        user.picture = picture;
+        updated = true;
+      }
+      let uid = undefined;
+      if (user.role === 'Student') {
+        let studentProfile = await StudentProfile.findOne({ user: user._id });
+        if (!studentProfile) {
+          const cleanName = user.name.replace(/\s+/g, '').toUpperCase();
+          const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+          studentProfile = await StudentProfile.create({ user: user._id, uid: `${cleanName}#${randomSuffix}` });
+        } else if (!studentProfile.uid) {
+          const cleanName = user.name.replace(/\s+/g, '').toUpperCase();
+          const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+          studentProfile.uid = `${cleanName}#${randomSuffix}`;
+          await studentProfile.save();
+        }
+        uid = studentProfile.uid;
       }
       if (updated) {
         await user.save();
@@ -183,7 +294,16 @@ export const googleLogin = async (req, res) => {
         googleId,
         role: role || 'Teacher',
         isVerified: true,
+        picture,
       });
+
+      if (user.role === 'Teacher') {
+        await TeacherProfile.create({ user: user._id });
+      } else if (user.role === 'Student') {
+        const cleanName = user.name.replace(/\s+/g, '').toUpperCase();
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        await StudentProfile.create({ user: user._id, uid: `${cleanName}#${randomSuffix}` });
+      }
 
       // Send welcome email asynchronously for new Google users
       sendWelcomeEmail(email, name).catch((err) => {
@@ -191,11 +311,19 @@ export const googleLogin = async (req, res) => {
       });
     }
 
+    let finalUid = undefined;
+    if (user.role === 'Student') {
+      const studentProfile = await StudentProfile.findOne({ user: user._id });
+      if (studentProfile) finalUid = studentProfile.uid;
+    }
+
     res.json({
       _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
+      picture: user.picture,
+      uid: finalUid,
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -250,6 +378,8 @@ export const verifyOTP = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      picture: user.picture,
+      uid: user.uid,
       token: generateToken(user._id),
       message: 'Account verified successfully!'
     });
