@@ -110,7 +110,7 @@ export default function ActiveTeacherCourses() {
 
                 {/* CTA Button */}
                 <button className="w-full py-3 px-4 bg-gray-900 hover:bg-emerald-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2">
-                  Enroll Now / Explore
+                  Enroll Now / Explore Curriculum
                   <span className="group-hover:translate-x-1 transition-transform">→</span>
                 </button>
               </div>

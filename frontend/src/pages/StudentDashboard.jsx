@@ -1100,8 +1100,6 @@ export default function StudentDashboard() {
                   </p>
                 </div>
 
-                <ActiveTeacherCourses />
-
                 {/* Dashboard statistics grids */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-[#070b09]/50 border border-white/[0.08] p-5 rounded-2xl">
@@ -1132,8 +1130,10 @@ export default function StudentDashboard() {
                 className="space-y-6"
               >
                 {!selectedCourse ? (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-black text-white font-space">Your Branching Syllabus</h3>
+                  <>
+                    <ActiveTeacherCourses />
+                    <div className="space-y-4 mt-6">
+                      <h3 className="text-lg font-black text-white font-space">Your Branching Syllabus</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {courses.map((course) => (
                         <div
@@ -1165,6 +1165,7 @@ export default function StudentDashboard() {
                       ))}
                     </div>
                   </div>
+                  </>
                 ) : (
                   // Course Player Screen
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
