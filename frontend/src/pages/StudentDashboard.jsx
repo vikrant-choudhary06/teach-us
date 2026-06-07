@@ -1100,8 +1100,6 @@ export default function StudentDashboard() {
                   </p>
                 </div>
 
-                <ActiveTeacherCourses />
-
                 {/* Dashboard statistics grids */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-[#070b09]/50 border border-white/[0.08] p-5 rounded-2xl">
@@ -1132,8 +1130,10 @@ export default function StudentDashboard() {
                 className="space-y-6"
               >
                 {!selectedCourse ? (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-black text-white font-space">Your Branching Syllabus</h3>
+                  <>
+                    <ActiveTeacherCourses />
+                    <div className="space-y-4 mt-6">
+                      <h3 className="text-lg font-black text-white font-space">Your Branching Syllabus</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {courses.map((course) => (
                         <div
@@ -1144,6 +1144,15 @@ export default function StudentDashboard() {
                             <span className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/25 rounded-md text-[9px] font-bold text-emerald-400 tracking-wider uppercase font-space">
                               Adaptive Branching
                             </span>
+                            {course.courseImage && (
+                              <div className="mt-4 rounded-xl overflow-hidden h-32 w-full border border-white/[0.08]">
+                                <img 
+                                  src={course.courseImage.startsWith('http') ? course.courseImage : `${API_URL}${course.courseImage}`} 
+                                  alt={course.title} 
+                                  className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
+                                />
+                              </div>
+                            )}
                             <h4 className="text-base font-black text-white mt-4 font-space truncate">{course.title}</h4>
                             <p className="text-xs text-gray-400 leading-relaxed font-semibold mt-2.5 mb-6">
                               {course.description || 'No description provided.'}
@@ -1165,6 +1174,7 @@ export default function StudentDashboard() {
                       ))}
                     </div>
                   </div>
+                  </>
                 ) : (
                   // Course Player Screen
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
