@@ -234,7 +234,10 @@ export const initSocket = (server) => {
         whiteboardHistory: [],
         doubts: [],
         chatMessages: [],
-        students: []
+        students: [],
+        isSharingWhiteboard: false,
+        zoom: 1.0,
+        panOffset: { x: 0, y: 0 }
       };
       socket.join(`deck_${deckUid}`);
       socket.deckUid = deckUid;
@@ -276,7 +279,10 @@ export const initSocket = (server) => {
           whiteboardHistory: deck.whiteboardHistory,
           chatMessages: deck.chatMessages,
           doubts: deck.doubts,
-          students: deck.students
+          students: deck.students,
+          isSharingWhiteboard: deck.isSharingWhiteboard || false,
+          zoom: deck.zoom || 1.0,
+          panOffset: deck.panOffset || { x: 0, y: 0 }
         });
         console.log(`[Socket] Student ${studentDetails.name} joined flight deck ${deckUid} and synced state`);
       } else {
@@ -316,6 +322,22 @@ export const initSocket = (server) => {
       if (socket.deckUid && activeDecks[socket.deckUid]) {
         activeDecks[socket.deckUid].whiteboardHistory = history;
         socket.to(`deck_${socket.deckUid}`).emit('student:sync_history', history);
+      }
+    });
+
+    socket.on('teacher:toggle_share_whiteboard', ({ isSharing }) => {
+      if (socket.deckUid && activeDecks[socket.deckUid]) {
+        activeDecks[socket.deckUid].isSharingWhiteboard = isSharing;
+        socket.to(`deck_${socket.deckUid}`).emit('student:toggle_share_whiteboard', { isSharing });
+        console.log(`[Socket] Teacher toggled share whiteboard: ${isSharing}`);
+      }
+    });
+
+    socket.on('teacher:sync_zoom_pan', ({ zoom, panOffset }) => {
+      if (socket.deckUid && activeDecks[socket.deckUid]) {
+        activeDecks[socket.deckUid].zoom = zoom;
+        activeDecks[socket.deckUid].panOffset = panOffset;
+        socket.to(`deck_${socket.deckUid}`).emit('student:sync_zoom_pan', { zoom, panOffset });
       }
     });
 

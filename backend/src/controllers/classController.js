@@ -1,5 +1,6 @@
 import Attendance from '../models/Attendance.js';
-import Student from '../models/Student.js';
+import User from '../models/User.js';
+import StudentProfile from '../models/StudentProfile.js';
 import Lesson from '../models/Lesson.js';
 import Poll from '../models/Poll.js';
 import { sendAbsentAlert } from '../services/emailService.js';
@@ -66,8 +67,9 @@ const triggerAbsenceAutomation = async (studentId, teacherId) => {
   console.log(`[Connected Pipeline] Absent state detected for Student ${studentId}. Initializing alert workflow...`);
 
 
-  const student = await Student.findById(studentId).populate('parentId');
-  if (!student || !student.parentId || !student.parentId.email) {
+  const studentUser = await User.findById(studentId);
+  const studentProfile = await StudentProfile.findOne({ user: studentId }).populate('parentId');
+  if (!studentUser || !studentProfile || !studentProfile.parentId || !studentProfile.parentId.email) {
     console.log(`[Connected Pipeline] Aborting: No parent email registered for Student ${studentId}`);
     return;
   }
@@ -82,8 +84,8 @@ const triggerAbsenceAutomation = async (studentId, teacherId) => {
     : 'Please review the textbook chapter for today and write a short summary.';
 
 
-  await sendAbsentAlert(student.parentId.email, student.name, studyGuide, makeupAssignment);
-  console.log(`[Connected Pipeline] Completed automated absence workflow for student ${student.name}`);
+  await sendAbsentAlert(studentProfile.parentId.email, studentUser.name, studyGuide, makeupAssignment);
+  console.log(`[Connected Pipeline] Completed automated absence workflow for student ${studentUser.name}`);
 };
 
 

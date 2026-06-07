@@ -1,6 +1,6 @@
 import fs from 'fs';
 import Gradebook from '../models/Gradebook.js';
-import Student from '../models/Student.js';
+import User from '../models/User.js';
 import { 
   gradeHomeworkWithAI, 
   solveMathWithAI, 
@@ -26,7 +26,7 @@ export const gradeHomework = async (req, res) => {
 
   try {
 
-    const student = await Student.findById(studentId);
+    const student = await User.findById(studentId);
     if (!student) {
       fs.unlinkSync(req.file.path);
       return res.status(404).json({ message: 'Student not found' });
