@@ -195,95 +195,6 @@ export default function Navbar() {
             </button>
           </div>
         </div>
-
-        {/* Mobile Dropdown Menu */}
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className="absolute left-0 right-0 top-21 p-6 bg-white border-b border-brand-forest/15 shadow-2xl md:hidden z-40"
-            >
-              <div className="flex flex-col gap-4">
-                {menuItems.map((item) => (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    className="text-brand-text-muted hover:text-brand-forest transition-colors font-semibold text-base py-1"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    {item.label}
-                  </a>
-                ))}
-
-                <div className="h-px bg-brand-forest/10 my-2" />
-
-                {userEmail ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3 bg-brand-sage/40 p-3 rounded-2xl border border-brand-forest/10">
-                      <div className="w-9 h-9 rounded-full overflow-hidden border border-emerald-500/20 bg-emerald-500/10 flex items-center justify-center">
-                        {userInfo?.picture ? (
-                          <img src={userInfo.picture} alt="Profile" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="font-bold text-brand-forest text-xs uppercase">
-                            {(userInfo?.name || userEmail).substring(0, 2).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-brand-forest truncate">{userInfo?.name || 'User'}</p>
-                        <p className="text-[10px] text-brand-text-muted truncate">{userEmail}</p>
-                      </div>
-                    </div>
-                    <Link
-                      to={dashboardPath}
-                      className="w-full bg-brand-forest hover:bg-brand-forest-hover text-white font-semibold text-center py-3 rounded-full transition-all duration-300 text-sm shadow-md"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Go to Dashboard
-                    </Link>
-                    <button
-                      onClick={() => {
-                        setIsOpen(false);
-                        handleLogout();
-                      }}
-                      className="w-full border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-600 font-bold text-center py-3 rounded-full transition-all duration-300 text-sm cursor-pointer"
-                    >
-                      Log Out
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    <Link
-                      to="/login"
-                      className="text-brand-text-muted hover:text-brand-forest font-medium text-base text-center py-2"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Login
-                    </Link>
-                    <Link
-                      to="/login"
-                      className="w-full bg-brand-forest hover:bg-brand-forest-hover text-white font-semibold text-center py-3 rounded-full transition-all duration-300 text-sm shadow-md"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Get Started
-                    </Link>
-                    <a
-                      href="tel:+919719205268"
-                      className="w-full bg-white hover:bg-gray-50 text-brand-forest border border-brand-forest/20 font-semibold text-center py-3 rounded-full transition-all duration-300 text-sm shadow-sm flex items-center justify-center gap-2"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      <HiPhone size={16} />
-                      <span>Call Us: +91 9719205268</span>
-                    </a>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       {/* Mobile Dropdown Menu */}
@@ -310,16 +221,66 @@ export default function Navbar() {
 
               <div className="h-px bg-brand-forest/10 my-2" />
 
-              <div className="flex flex-col gap-3">
-                <a
-                  href="tel:+919719205268"
-                  className="w-full bg-brand-forest hover:bg-brand-forest-hover text-white font-semibold text-center py-3 rounded-full transition-all duration-300 text-sm shadow-md flex items-center justify-center gap-2"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <HiPhone size={16} />
-                  <span>Call Us: +91 9719205268</span>
-                </a>
-              </div>
+              {userEmail ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3 bg-brand-sage/40 p-3 rounded-2xl border border-brand-forest/10">
+                    <div className="w-9 h-9 rounded-full overflow-hidden border border-emerald-500/20 bg-emerald-500/10 flex items-center justify-center">
+                      {userInfo?.picture ? (
+                        <img src={userInfo.picture} alt="Profile" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="font-bold text-brand-forest text-xs uppercase">
+                          {(userInfo?.name || userEmail).substring(0, 2).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-brand-forest truncate">{userInfo?.name || 'User'}</p>
+                      <p className="text-[10px] text-brand-text-muted truncate">{userEmail}</p>
+                    </div>
+                  </div>
+                  <Link
+                    to={dashboardPath}
+                    className="w-full bg-brand-forest hover:bg-brand-forest-hover text-white font-semibold text-center py-3 rounded-full transition-all duration-300 text-sm shadow-md"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Go to Dashboard
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setIsOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-600 font-bold text-center py-3 rounded-full transition-all duration-300 text-sm cursor-pointer"
+                  >
+                    Log Out
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <Link
+                    to="/login"
+                    className="text-brand-text-muted hover:text-brand-forest font-medium text-base text-center py-2"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/login"
+                    className="w-full bg-brand-forest hover:bg-brand-forest-hover text-white font-semibold text-center py-3 rounded-full transition-all duration-300 text-sm shadow-md"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Get Started
+                  </Link>
+                  <a
+                    href="tel:+919719205268"
+                    className="w-full bg-white hover:bg-gray-50 text-brand-forest border border-brand-forest/20 font-semibold text-center py-3 rounded-full transition-all duration-300 text-sm shadow-sm flex items-center justify-center gap-2"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <HiPhone size={16} />
+                    <span>Call Us: +91 9719205268</span>
+                  </a>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

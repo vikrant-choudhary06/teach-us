@@ -7,8 +7,8 @@ import { sendVerificationOTP, sendWelcomeEmail } from '../services/emailService.
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'supersecretclassoskey123!', {
+const generateToken = (id, email = '') => {
+  return jwt.sign({ id, email }, process.env.JWT_SECRET || 'supersecretclassoskey123!', {
     expiresIn: '30d',
   });
 };
@@ -145,7 +145,7 @@ export const loginUser = async (req, res) => {
         role: user.role,
         picture: user.picture,
         uid: uid,
-        token: generateToken(user._id),
+        token: generateToken(user._id, user.email),
       });
     } else {
       res.status(401).json({ message: 'Invalid email or password' });
@@ -324,7 +324,7 @@ export const googleLogin = async (req, res) => {
       role: user.role,
       picture: user.picture,
       uid: finalUid,
-      token: generateToken(user._id),
+      token: generateToken(user._id, user.email),
     });
   } catch (error) {
     console.error('Google Auth Error:', error);
@@ -380,7 +380,7 @@ export const verifyOTP = async (req, res) => {
       role: user.role,
       picture: user.picture,
       uid: user.uid,
-      token: generateToken(user._id),
+      token: generateToken(user._id, user.email),
       message: 'Account verified successfully!'
     });
   } catch (error) {

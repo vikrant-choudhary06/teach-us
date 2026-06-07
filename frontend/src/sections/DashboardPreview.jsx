@@ -22,37 +22,36 @@ export default function DashboardPreview() {
   };
 
   const sidebarItems = [
-    { label: 'Dashboard', icon: HiSquares2X2, active: true },
+    { label: 'Control Center', icon: HiSquares2X2, active: true },
     { label: 'My Library', icon: HiFolder },
     { label: 'My Workspace', icon: HiAcademicCap },
-    { label: 'Lesson Planner', icon: HiDocumentText },
-    { label: 'Paper Explorer', icon: HiDocumentText },
-    { label: 'Visual Aids', icon: HiPhotograph },
-    { label: 'Math Solver', icon: HiCalculator },
+    { label: 'AI Syllabus Architect', icon: HiDocumentText },
+    { label: 'Resource Hub', icon: HiDocumentText },
+    { label: 'Interactive Lab', icon: HiPhotograph },
   ];
 
   const quickTools = [
     {
-      title: 'Lesson Planner',
-      desc: 'Create engaging lesson plans tailored to your curriculum.',
+      title: 'AI Syllabus Architect',
+      desc: 'Create engaging course syllabus plans tailored to your curriculum.',
       icon: HiDocumentText,
       action: 'Launch'
     },
     {
-      title: 'Visual Aids',
-      desc: 'Generate custom visual aids to explain complex topics.',
+      title: 'Interactive Lab',
+      desc: 'Generate custom visual aids and solve complex problems.',
       icon: HiPhotograph,
       action: 'Launch'
     },
     {
-      title: 'Math Solver',
-      desc: 'Solve complex math problems step-by-step.',
-      icon: HiCalculator,
+      title: 'Resource Hub',
+      desc: 'Digitize and host syllabus documents, PDFs, and assets.',
+      icon: HiBookOpen,
       action: 'Launch'
     },
     {
-      title: 'Paper Explorer',
-      desc: 'Generate test papers, worksheets, and exams instantly.',
+      title: 'Cohort Stream',
+      desc: 'Live interactive streaming and cohort member monitoring.',
       icon: HiBookOpen,
       action: 'Launch'
     }
@@ -131,7 +130,7 @@ export default function DashboardPreview() {
                   <div className="flex items-start justify-between">
                     <div>
                       <h2 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
-                        Good morning, Teachers
+                        Good morning, Creators
                       </h2>
                       <p className="text-xs sm:text-sm text-gray-400 font-medium mt-1">
                         Ready to create something amazing? Your AI assistant is here to help.

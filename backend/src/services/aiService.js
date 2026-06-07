@@ -205,51 +205,59 @@ export const digitizePaperWithAI = async (filePath, mimeType) => {
 export const generateLessonPlanWithAI = async (grade, subject, topic, duration, objectives) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured. AI Lesson Planner is disabled.');
+    throw new Error('GEMINI_API_KEY is not configured. AI Course Blueprint Planner is disabled.');
   }
+
+  const targetAudience = grade;
+  const skillDepth = subject;
+  const deliveryMethod = duration;
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const prompt = `
-      You are the ClassOS AI Auto-Lesson Planner.
-      Generate a comprehensive lesson plan timeline for the following details:
-      Grade/Class level: "${grade}"
-      Subject: "${subject}"
-      Topic: "${topic}"
-      Duration: "${duration} Mins"
-      Learning Objectives: "${objectives || 'Master core parameters of the topic.'}"
+      You are the AI Syllabus Architect & Course Blueprint Generator.
+      Generate a comprehensive syllabus or course blueprint timeline for the following details:
+      Target Audience: "${targetAudience}"
+      Skill Depth: "${skillDepth}"
+      Course Topic & Objective: "${topic}"
+      Delivery Method: "${deliveryMethod}"
+      Additional Objectives: "${objectives || 'Master core parameters of the course.'}"
 
       Create a detailed plan. Your response must be a strict JSON object structure:
       {
-        "title": "Comprehensive Lesson Title",
-        "subject": "Syllabus subject name",
-        "grade": "Grade level",
-        "duration": "Duration in Mins",
-        "objectives": "The student learning objectives...",
+        "title": "Comprehensive Course/Syllabus Title",
+        "subject": "Skill depth",
+        "grade": "Target audience",
+        "duration": "Delivery method",
+        "objectives": "The course learning objectives...",
         "workflow": [
           {
             "id": 1,
-            "phase": "Introduction & Hook",
-            "duration": "10",
-            "details": "Introduce concepts using visual slides..."
+            "phase": "Introduction & Fundamentals",
+            "time": "e.g. Week 1 / Day 1 / Session 1",
+            "title": "Topic or Activity Title",
+            "desc": "Detailed instructions or description of the topics/activities covered..."
           },
           {
             "id": 2,
-            "phase": "Core Concept Deep-Dive",
-            "duration": "20",
-            "details": "Teach core variables and equations..."
+            "phase": "Core Practical Lab",
+            "time": "e.g. Week 2 / Day 2 / Session 2",
+            "title": "Deep-Dive Practice",
+            "desc": "Hands-on exercises, core logic, architecture implementation..."
           },
           {
             "id": 3,
-            "phase": "Interactive Quiz or Assignment",
-            "duration": "10",
-            "details": "Deploy a multi-path quiz..."
+            "phase": "Interactive Assignment",
+            "time": "e.g. Week 3 / Day 3 / Session 3",
+            "title": "Project Showcase",
+            "desc": "Deploying a complete showcase project..."
           },
           {
             "id": 4,
-            "phase": "Recap & Exit Ticket",
-            "duration": "5",
-            "details": "Address doubts and wrap up..."
+            "phase": "Review & Certification",
+            "time": "e.g. Week 4 / Day 4 / Session 4",
+            "title": "Final Feedback",
+            "desc": "Address questions and issue credentials..."
           }
         ]
       }
@@ -264,7 +272,7 @@ export const generateLessonPlanWithAI = async (grade, subject, topic, duration, 
     const jsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(jsonStr);
   } catch (error) {
-    console.error('Gemini AI Lesson Planner service error:', error);
+    console.error('Gemini AI Course Blueprint Planner service error:', error);
     throw error;
   }
 };
