@@ -1,8 +1,11 @@
 import express from 'express';
-import { createCourse, getCourses, getCourseById, updateCourse } from '../controllers/courseController.js';
+import { createCourse, getCourses, getCourseById, updateCourse, getActiveFeed } from '../controllers/courseController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+router.route('/feed')
+  .get(protect, getActiveFeed);
 
 router.route('/')
   .post(protect, authorize('Teacher'), createCourse)

@@ -21,6 +21,20 @@ export const createCourse = async (req, res) => {
   }
 };
 
+// Get active feed of courses for student dashboard
+export const getActiveFeed = async (req, res) => {
+  try {
+    // Return top 10 most recent active courses for the feed
+    const courses = await BranchingCourse.find({})
+      .populate('teacherId', 'name email picture')
+      .sort({ createdAt: -1 })
+      .limit(10);
+    res.json(courses);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get all courses
 export const getCourses = async (req, res) => {
   try {

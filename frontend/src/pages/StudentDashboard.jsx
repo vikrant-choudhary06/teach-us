@@ -21,6 +21,8 @@ import {
   HiOutlineMenuAlt2
 } from 'react-icons/hi'
 
+import ActiveTeacherCourses from '../components/ActiveTeacherCourses'
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 const defaultCourses = [
@@ -1097,6 +1099,8 @@ export default function StudentDashboard() {
                     Dive into your personalized branching curriculum. Answer Micro-Quizzes to dynamically adapt course difficulty to your level, or find a peer and study together in real-time Co-Op rooms.
                   </p>
                 </div>
+
+                <ActiveTeacherCourses />
 
                 {/* Dashboard statistics grids */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
