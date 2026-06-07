@@ -67,6 +67,15 @@ export default function ActiveTeacherCourses() {
               className="min-w-[320px] max-w-[340px] flex-shrink-0 snap-start bg-gray-50 rounded-2xl p-5 border border-gray-200 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all cursor-pointer group flex flex-col justify-between"
             >
               <div>
+                {course.courseImage && (
+                  <div className="mb-4 rounded-xl overflow-hidden h-36 w-full border border-gray-100 shadow-sm">
+                    <img 
+                      src={course.courseImage.startsWith('http') ? course.courseImage : `${API_URL}${course.courseImage}`} 
+                      alt={course.title} 
+                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
+                    />
+                  </div>
+                )}
                 {/* Glowing Premium Tags */}
                 <div className="mb-4">
                   {isLive ? (

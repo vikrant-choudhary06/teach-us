@@ -17,16 +17,14 @@ import classRoutes from './routes/classRoutes.js';
 import graderRoutes from './routes/graderRoutes.js';
 import lessonRoutes from './routes/lessonRoutes.js';
 import courseRoutes from './routes/courseRoutes.js';
-
+import uploadRoutes from './routes/uploadRoutes.js';
 
 dotenv.config();
-
 
 connectDB();
 
 const app = express();
 const server = http.createServer(app);
-
 
 const allowedOrigins = [
   'https://teach-us.vercel.app',
@@ -54,9 +52,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-app.use('/uploads', express.static('uploads'));
-
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/students', studentRoutes);
@@ -64,6 +60,7 @@ app.use('/api/class', classRoutes);
 app.use('/api/grader', graderRoutes);
 app.use('/api/lessons', lessonRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/upload', uploadRoutes);
 
 
 app.get('/api/health', (req, res) => {

@@ -1144,6 +1144,15 @@ export default function StudentDashboard() {
                             <span className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/25 rounded-md text-[9px] font-bold text-emerald-400 tracking-wider uppercase font-space">
                               Adaptive Branching
                             </span>
+                            {course.courseImage && (
+                              <div className="mt-4 rounded-xl overflow-hidden h-32 w-full border border-white/[0.08]">
+                                <img 
+                                  src={course.courseImage.startsWith('http') ? course.courseImage : `${API_URL}${course.courseImage}`} 
+                                  alt={course.title} 
+                                  className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
+                                />
+                              </div>
+                            )}
                             <h4 className="text-base font-black text-white mt-4 font-space truncate">{course.title}</h4>
                             <p className="text-xs text-gray-400 leading-relaxed font-semibold mt-2.5 mb-6">
                               {course.description || 'No description provided.'}

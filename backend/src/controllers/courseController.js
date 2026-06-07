@@ -3,7 +3,7 @@ import BranchingCourse from '../models/BranchingCourse.js';
 // Create a new branching course
 export const createCourse = async (req, res) => {
   try {
-    const { title, description, chapters } = req.body;
+    const { title, description, chapters, courseImage } = req.body;
     if (!title || !chapters || chapters.length === 0) {
       return res.status(400).json({ message: 'Title and chapters are required' });
     }
@@ -11,6 +11,7 @@ export const createCourse = async (req, res) => {
     const course = await BranchingCourse.create({
       title,
       description,
+      courseImage,
       teacherId: req.user._id,
       chapters,
     });
@@ -61,7 +62,7 @@ export const getCourseById = async (req, res) => {
 // Update course syllabus
 export const updateCourse = async (req, res) => {
   try {
-    const { title, description, chapters } = req.body;
+    const { title, description, chapters, courseImage } = req.body;
     const course = await BranchingCourse.findById(req.params.id);
     if (!course) {
       return res.status(404).json({ message: 'Course not found' });
@@ -75,6 +76,7 @@ export const updateCourse = async (req, res) => {
     if (title !== undefined) course.title = title;
     if (description !== undefined) course.description = description;
     if (chapters !== undefined) course.chapters = chapters;
+    if (courseImage !== undefined) course.courseImage = courseImage;
 
     const updatedCourse = await course.save();
     res.json(updatedCourse);
