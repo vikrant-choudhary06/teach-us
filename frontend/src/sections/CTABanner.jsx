@@ -47,7 +47,7 @@ export default function CTABanner() {
             </h2>
 
             <p className="text-base sm:text-lg text-gray-300 mb-10 leading-relaxed">
-              Join thousands of educators who've transformed their classrooms with Acharya AI. Get started free, no credit card required.
+              Join thousands of educators who've transformed their classrooms with techUs. Get started free, no credit card required.
             </p>
 
             {/* Features List */}

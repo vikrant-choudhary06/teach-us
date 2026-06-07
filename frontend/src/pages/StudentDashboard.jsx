@@ -959,7 +959,7 @@ export default function StudentDashboard() {
             }`}
           >
             <HiOutlineHome size={18} className="mr-2 text-emerald-400" />
-            {!isSidebarCollapsed && <span>Overview</span>}
+            {!isSidebarCollapsed && <span>Control Center</span>}
           </button>
 
           <button
@@ -998,7 +998,7 @@ export default function StudentDashboard() {
             }`}
           >
             <HiOutlineSparkles size={18} className="mr-2 text-emerald-400" />
-            {!isSidebarCollapsed && <span>Live Class</span>}
+            {!isSidebarCollapsed && <span>Cohort Stream</span>}
           </button>
         </nav>
 
@@ -1070,7 +1070,7 @@ export default function StudentDashboard() {
               <HiOutlineMenuAlt2 size={22} />
             </button>
             <h1 className="text-base font-black tracking-tight uppercase text-white font-space">
-              Student Dashboard <span className="text-emerald-400">/ {activeTab}</span>
+              Learner Dashboard <span className="text-emerald-400">/ {activeTab}</span>
             </h1>
           </div>
           <div className="flex items-center gap-4">
@@ -1101,7 +1101,7 @@ export default function StudentDashboard() {
                 {/* Dashboard statistics grids */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-[#070b09]/50 border border-white/[0.08] p-5 rounded-2xl">
-                    <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">Class Credits Earned</p>
+                    <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider">Course Credits Earned</p>
                     <p className="text-white text-3xl font-black font-space mt-2">{credits}</p>
                     <p className="text-[10px] text-emerald-400 font-bold mt-1.5">Daily Progress Status Active</p>
                   </div>
@@ -1685,8 +1685,8 @@ export default function StudentDashboard() {
                       <HiOutlineSparkles size={28} />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-white font-space">Join Live Flight Deck</h3>
-                      <p className="text-xs text-gray-500 mt-1">Enter the 6-digit Deck PIN provided by your Professor.</p>
+                      <h3 className="text-xl font-bold text-white font-space">Join Cohort Stream</h3>
+                      <p className="text-xs text-gray-500 mt-1">Enter the 6-digit Stream PIN provided by your Instructor/Creator.</p>
                     </div>
                     <div className="flex gap-2 w-full">
                        <input 

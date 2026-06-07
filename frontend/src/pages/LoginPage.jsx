@@ -166,7 +166,7 @@ export default function LoginPage() {
               <HiBookOpen className="text-black" size={20} />
             </div>
             <span className="text-xl font-black tracking-tight text-white font-space">
-              Acharya <span className="text-emerald-400">AI</span>
+              techUs
             </span>
           </div>
 
@@ -228,7 +228,7 @@ export default function LoginPage() {
             ))}
           </motion.div>
           <p className="text-xs text-gray-600 font-bold">
-            © 2026 Acharya AI. Crafted for progressive educators.
+            © 2026 techUs. Crafted for progressive educators.
           </p>
         </div>
       </motion.aside>
@@ -249,13 +249,13 @@ export default function LoginPage() {
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/20">
                 <HiBookOpen className="text-black" size={20} />
               </div>
-              <span className="text-xl font-black text-white font-space">Acharya <span className="text-emerald-400">AI</span></span>
+              <span className="text-xl font-black text-white font-space">techUs</span>
             </div>
           </div>
 
           <div className="text-center space-y-3 mb-10">
             <h2 className="text-3xl font-black text-white tracking-tight font-space animate-pulse">
-              Sign In to Acharya AI
+              Sign In to techUs
             </h2>
             <p className="text-xs text-gray-400 font-semibold max-w-[280px] mx-auto leading-relaxed">
               Secure, single sign-on using your institutional Google account.

@@ -5,6 +5,12 @@
   --color-brand-emerald: #10b981;
   --color-brand-green: #22c55e;
   --color-brand-mint: #34d399;
+  --color-brand-forest: #0F2D24;
+  --color-brand-forest-hover: #153C30;
+  --color-brand-sage: #E7EFE9;
+  --color-brand-cream: #FAFBF9;
+  --color-brand-text-dark: #0F2D24;
+  --color-brand-text-muted: #4A5A50;
   --color-dark-bg: #000000;
   --color-dark-card: rgba(255, 255, 255, 0.02);
   --font-space: 'Space Grotesk', sans-serif;
@@ -15,11 +21,11 @@
   html {
     scroll-behavior: smooth;
     overflow-x: hidden;
-    background-color: #000000;
+    background-color: #FAFBF9;
   }
 
   body {
-    @apply bg-black text-white antialiased;
+    @apply bg-brand-cream text-brand-text-muted antialiased;
     margin: 0;
     overflow-x: hidden;
     font-family: 'Inter', 'Manrope', sans-serif;
@@ -31,7 +37,7 @@
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    background-color: #000000;
+    background-color: #FAFBF9;
   }
 }
 

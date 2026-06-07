@@ -24,10 +24,10 @@ export default function NewsletterSection() {
   };
 
   return (
-    <section className="py-24 bg-black relative overflow-hidden border-t border-white/[0.04]">
+    <section className="py-24 bg-brand-cream relative overflow-hidden border-t border-brand-forest/10">
       {/* Decorative Glow */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[350px] h-[350px] bg-emerald-600/3 rounded-full blur-[100px]" />
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[350px] h-[350px] bg-brand-sage/20 rounded-full blur-[100px]" />
       </div>
 
       <div className="container-custom relative z-10 px-4 text-center">
@@ -37,7 +37,7 @@ export default function NewsletterSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="font-space text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4"
+          className="font-space text-3xl sm:text-4xl lg:text-5xl font-bold text-brand-forest mb-4"
         >
           Join our newsletter to stay updated.
         </motion.h2>
@@ -48,7 +48,7 @@ export default function NewsletterSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-gray-400 text-sm sm:text-base lg:text-lg max-w-xl mx-auto leading-relaxed"
+          className="text-brand-text-muted text-sm sm:text-base lg:text-lg max-w-xl mx-auto leading-relaxed"
         >
           Get the latest news, feature updates, and educational insights delivered straight to your inbox.
         </motion.p>
@@ -68,10 +68,10 @@ export default function NewsletterSection() {
                 onSubmit={handleSubmit}
                 initial={{ opacity: 1 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="flex items-center bg-white/[0.02] border border-white/[0.08] hover:border-white/20 focus-within:border-emerald-500/50 focus-within:ring-1 focus-within:ring-emerald-500/20 rounded-full p-1.5 transition-all duration-300"
+                className="flex items-center bg-white border border-brand-forest/15 hover:border-brand-forest/30 focus-within:border-brand-forest focus-within:ring-1 focus-within:ring-brand-forest/20 rounded-full p-1.5 transition-all duration-300 shadow-sm"
               >
                 {/* Mail Icon */}
-                <span className="pl-4 text-gray-400 shrink-0">
+                <span className="pl-4 text-brand-text-muted/70 shrink-0">
                   <HiMail size={20} />
                 </span>
 
@@ -84,7 +84,7 @@ export default function NewsletterSection() {
                   placeholder="Enter your email"
                   pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
                   title="Please enter a valid email address (e.g. user@example.com)"
-                  className="flex-1 bg-transparent border-0 outline-none text-white placeholder-gray-500 text-sm py-2.5 px-3 focus:ring-0 focus:outline-none w-full"
+                  className="flex-1 bg-transparent border-0 outline-none text-brand-forest placeholder-brand-text-muted/60 text-sm py-2.5 px-3 focus:ring-0 focus:outline-none w-full"
                   disabled={status === 'submitting'}
                 />
 
@@ -92,7 +92,7 @@ export default function NewsletterSection() {
                 <button
                   type="submit"
                   disabled={status === 'submitting'}
-                  className="bg-[var(--color-emerald-500)] hover:bg-[var(--color-emerald-600)] text-[var(--theme-btn-text,#000000)] font-bold text-xs sm:text-sm px-6 py-3 rounded-full transition-all shrink-0 disabled:opacity-50 select-none"
+                  className="bg-[var(--color-emerald-500)] hover:bg-[var(--color-emerald-600)] text-[var(--theme-btn-text,#000000)] font-bold text-xs sm:text-sm px-6 py-3 rounded-full transition-all shrink-0 disabled:opacity-50 select-none cursor-pointer"
                   style={{ boxShadow: '0 2px 15px rgba(var(--theme-spotlight-color, 16, 185, 129), 0.15)' }}
                 >
                   {status === 'submitting' ? 'Subscribing...' : 'Subscribe'}
@@ -103,9 +103,9 @@ export default function NewsletterSection() {
                 key="success"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="inline-flex items-center gap-2 px-6 py-4 rounded-full border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-sm font-semibold"
+                className="inline-flex items-center gap-2 px-6 py-4 rounded-full border border-brand-forest/20 bg-brand-sage text-brand-forest text-sm font-semibold shadow-sm"
               >
-                <HiCheckCircle size={20} className="animate-bounce" />
+                <HiCheckCircle size={20} className="animate-bounce text-brand-forest" />
                 <span>Subscribed! Check your inbox for confirmation.</span>
               </motion.div>
             )}

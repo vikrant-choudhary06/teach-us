@@ -5,14 +5,14 @@ import { HiOutlineX, HiOutlineChevronLeft, HiOutlineChevronRight, HiOutlineSpark
 const tourSteps = [
   {
     target: '[data-tour="dashboard-title"]',
-    title: 'Welcome to Acharya AI! 🚀',
-    content: 'Welcome to your premium teaching workspace. Let\'s do a walkthrough of our most powerful interactive feature: the Live Flight Deck!',
+    title: 'Welcome to TechUs AI! 🚀',
+    content: 'Welcome to your premium course creator workspace. Let\'s do a walkthrough of our most powerful interactive feature: the Cohort Stream!',
     placement: 'bottom'
   },
   {
     target: '[data-tour="nav-flight-deck"]',
-    title: 'Live Flight Deck 📡',
-    content: 'This is the command center of your live classroom. Let\'s switch to it to inspect how it works.',
+    title: 'Cohort Stream 📡',
+    content: 'This is the command center of your live cohort. Let\'s switch to it to inspect how it works.',
     placement: 'right'
   },
   {
@@ -24,19 +24,19 @@ const tourSteps = [
   {
     target: '[data-tour="flight-deck-seating"]',
     title: 'Interactive Seating Grid 🪑',
-    content: 'Monitor student screens and focus status live. desks show green for focused, amber for distracted, and flash red when a student has a doubt.',
+    content: 'Monitor cohort member screens and focus status live. Seats show green for focused, amber for distracted, and flash red when a member has a question.',
     placement: 'left'
   },
   {
     target: '[data-tour="flight-deck-add-student"]',
-    title: 'Classroom Enrollment 🧑‍🎓',
-    content: 'Enrolling new students to your active live class is simple. Click this button to enter their name and email details.',
+    title: 'Cohort Enrollment 🧑‍🎓',
+    content: 'Enrolling new members to your active live cohort is simple. Click this button to enter their details.',
     placement: 'left'
   },
   {
     target: '[data-tour="nav-overview"]',
     title: 'Sleek Sidebar Navigation 🧭',
-    content: 'Use this sidebar to jump back to the Dashboard, generate lesson plans, or check your daily credits.',
+    content: 'Use this sidebar to jump back to the Control Center, generate syllabus architects, or check your daily credits.',
     placement: 'right'
   }
 ]
