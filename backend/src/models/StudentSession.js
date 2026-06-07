@@ -1,35 +1,16 @@
 import mongoose from 'mongoose';
 
-const studentSchema = new mongoose.Schema(
+const studentSessionSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: true,
-    },
-    email: {
-      type: String,
-      lowercase: true,
-      trim: true,
-      validate: {
-        validator: function (v) {
-          if (!v) return true;
-          return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-        },
-        message: (props) => `${props.value} is not a valid email address!`,
-      },
-    },
-    teacherId: {
+    student: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-    },
-    parentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
     },
     classroom: {
-      type: String,
-      default: 'General',
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Classroom',
+      required: true,
     },
     row: {
       type: Number,
@@ -69,5 +50,8 @@ const studentSchema = new mongoose.Schema(
   }
 );
 
-const Student = mongoose.model('Student', studentSchema);
-export default Student;
+// Ensure a student only has one active session per classroom
+studentSessionSchema.index({ student: 1, classroom: 1 }, { unique: true });
+
+const StudentSession = mongoose.model('StudentSession', studentSessionSchema);
+export default StudentSession;
