@@ -70,9 +70,10 @@ export default function ActiveTeacherCourses() {
                 {course.courseImage && (
                   <div className="mb-4 rounded-xl overflow-hidden h-36 w-full border border-gray-100 shadow-sm">
                     <img 
-                      src={course.courseImage.startsWith('http') ? course.courseImage : `${API_URL}${course.courseImage}`} 
+                      src={course.courseImage.startsWith('http') ? course.courseImage : `${API_URL.replace(/\\/$/, '')}/${course.courseImage.replace(/^\\//, '')}`} 
                       alt={course.title} 
                       className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
+                      onError={(e) => { e.target.onerror = null; e.target.src = '/brain.jpg'; }}
                     />
                   </div>
                 )}

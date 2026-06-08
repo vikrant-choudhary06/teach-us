@@ -1147,9 +1147,10 @@ export default function StudentDashboard() {
                             {course.courseImage && (
                               <div className="mt-4 rounded-xl overflow-hidden h-32 w-full border border-white/[0.08]">
                                 <img 
-                                  src={course.courseImage.startsWith('http') ? course.courseImage : `${API_URL}${course.courseImage}`} 
+                                  src={course.courseImage.startsWith('http') ? course.courseImage : `${API_URL.replace(/\\/$/, '')}/${course.courseImage.replace(/^\\//, '')}`} 
                                   alt={course.title} 
                                   className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
+                                  onError={(e) => { e.target.onerror = null; e.target.src = '/brain.jpg'; }}
                                 />
                               </div>
                             )}

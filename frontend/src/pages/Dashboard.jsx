@@ -5872,9 +5872,10 @@ export function MyCoursesView({ showToast, setActiveTab, setDeployedMaterial }) 
                   {course.courseImage ? (
                     <div className="w-16 h-16 rounded-xl bg-black shrink-0 relative overflow-hidden border border-white/[0.08]">
                       <img 
-                        src={course.courseImage.startsWith('http') ? course.courseImage : `${API_URL}${course.courseImage}`} 
+                        src={course.courseImage.startsWith('http') ? course.courseImage : `${API_URL.replace(/\\/$/, '')}/${course.courseImage.replace(/^\\//, '')}`} 
                         alt={course.title} 
                         className="w-full h-full object-cover" 
+                        onError={(e) => { e.target.onerror = null; e.target.src = '/brain.jpg'; }}
                       />
                     </div>
                   ) : (
