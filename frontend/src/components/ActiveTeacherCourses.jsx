@@ -73,7 +73,6 @@ export default function ActiveTeacherCourses() {
                       src={course.courseImage.startsWith('http') ? course.courseImage : `${API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL}/${course.courseImage.startsWith('/') ? course.courseImage.substring(1) : course.courseImage}`} 
                       alt={course.title} 
                       className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" 
-                      onError={(e) => { e.target.onerror = null; e.target.src = '/brain.jpg'; }}
                     />
                   </div>
                 )}
