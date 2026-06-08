@@ -5384,6 +5384,7 @@ export function BranchingCourseCreator({ showToast, onCourseCreated }) {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [courseImageFile, setCourseImageFile] = useState(null);
   const [chapters, setChapters] = useState([
     {
       chapterTitle: 'Chapter 1: Foundations',
@@ -5439,19 +5440,40 @@ export function BranchingCourseCreator({ showToast, onCourseCreated }) {
         return;
       }
 
+      let uploadedImageUrl = '';
+      if (courseImageFile) {
+        const formData = new FormData();
+        formData.append('image', courseImageFile);
+        const uploadRes = await fetch(`${API_URL}/api/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${info.token}`
+          },
+          body: formData
+        });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          uploadedImageUrl = uploadData.image;
+        } else {
+          showToast('Failed to upload image', 'error');
+          return;
+        }
+      }
+
       const res = await fetch(`${API_URL}/api/courses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${info.token}`
         },
-        body: JSON.stringify({ title, description, chapters })
+        body: JSON.stringify({ title, description, courseImage: uploadedImageUrl, chapters })
       });
 
       if (res.ok) {
         showToast('Adaptive Branching Course Published Successfully!', 'success');
         setTitle('');
         setDescription('');
+        setCourseImageFile(null);
         setChapters([
           {
             chapterTitle: 'Chapter 1: Foundations',
@@ -5512,6 +5534,16 @@ export function BranchingCourseCreator({ showToast, onCourseCreated }) {
               className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
             />
           </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-gray-400">Course Thumbnail Image (Optional)</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setCourseImageFile(e.target.files[0])}
+            className="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500"
+          />
         </div>
 
         <div className="space-y-4">
@@ -5837,10 +5869,20 @@ export function MyCoursesView({ showToast, setActiveTab, setDeployedMaterial }) 
                   }`}
                 >
                   {/* Thumbnail Placeholder */}
-                  <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${gradientClass} flex items-center justify-center text-lg font-black shrink-0 relative overflow-hidden`}>
-                    <div className="absolute inset-0 bg-black/10 opacity-30 mix-blend-overlay" />
-                    <span className="font-space tracking-wider">{initials}</span>
-                  </div>
+                  {course.courseImage ? (
+                    <div className="w-16 h-16 rounded-xl bg-black shrink-0 relative overflow-hidden border border-white/[0.08]">
+                      <img 
+                        src={course.courseImage.startsWith('http') ? course.courseImage : `${API_URL}${course.courseImage}`} 
+                        alt={course.title} 
+                        className="w-full h-full object-cover" 
+                      />
+                    </div>
+                  ) : (
+                    <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${gradientClass} flex items-center justify-center text-lg font-black shrink-0 relative overflow-hidden`}>
+                      <div className="absolute inset-0 bg-black/10 opacity-30 mix-blend-overlay" />
+                      <span className="font-space tracking-wider">{initials}</span>
+                    </div>
+                  )}
 
                   {/* Course Details */}
                   <div className="flex-1 min-w-0 space-y-1">
