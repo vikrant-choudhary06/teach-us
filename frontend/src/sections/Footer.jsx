@@ -55,7 +55,7 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="bg-brand-forest text-white border-t border-white/5 pt-20 pb-8 select-none">
+    <footer id="about-us" className="bg-brand-forest text-white border-t border-white/5 pt-20 pb-8 select-none">
       <div className="container-custom px-4 max-w-6xl mx-auto">
         {/* Main Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-10 md:gap-12 pb-14">

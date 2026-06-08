@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { HiMenu, HiX, HiPhone } from "react-icons/hi";
+import { HiMenu, HiX } from "react-icons/hi";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -9,6 +9,7 @@ export default function Navbar() {
   const [userEmail, setUserEmail] = useState(null);
   const [userInfo, setUserInfo] = useState(null);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState("");
   const location = useLocation();
 
   useEffect(() => {
@@ -33,6 +34,35 @@ export default function Navbar() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const sections = ["features", "pricing", "about-us"];
+    
+    // Check initial hash on load
+    const currentHash = window.location.hash.replace("#", "");
+    if (sections.includes(currentHash)) {
+      setActiveSection(currentHash);
+    } else {
+      setActiveSection("");
+    }
+
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (sections.includes(hash)) {
+        setActiveSection(hash);
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+    };
+  }, []);
+
+  const handleItemClick = (href) => {
+    const sectionId = href.replace("#", "");
+    setActiveSection(sectionId);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('userEmail');
@@ -86,32 +116,29 @@ export default function Navbar() {
         <div className="flex-1 bg-brand-forest flex items-center justify-between px-6 sm:px-12 text-white">
           {/* Desktop Menu Links */}
           <div className="hidden md:flex items-center gap-3">
-            {menuItems.map((item, idx) => (
-              <a
-                key={item.label}
-                href={item.href}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all ${
-                  idx === 0
-                    ? "bg-white text-brand-forest shadow-sm"
-                    : "border border-white/10 hover:border-white/30 text-white/90 hover:text-white"
-                }`}
-              >
-                {item.label}
-              </a>
-            ))}
+            {menuItems.map((item) => {
+              const sectionId = item.href.replace("#", "");
+              const isActive = activeSection === sectionId;
+              return (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  onClick={() => handleItemClick(item.href)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide transition-all ${
+                    isActive
+                      ? "bg-white text-brand-forest shadow-sm"
+                      : "border border-white/10 hover:border-white/30 text-white/90 hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                </a>
+              );
+            })}
           </div>
 
           {/* CTA Buttons */}
           {userEmail ? (
             <div className="hidden md:flex items-center gap-5 relative">
-              <a
-                href="tel:+919719205268"
-                className="bg-[#E7EFE9] hover:bg-[#DCE6DF] text-brand-forest font-semibold text-xs px-5 py-2.5 rounded-full transition-all duration-300 shadow-sm hover:shadow flex items-center gap-2 active:scale-95 mr-2"
-              >
-                <HiPhone className="text-brand-forest shrink-0" size={14} />
-                <span>+91 9719205268</span>
-              </a>
-              
               <Link
                 to={dashboardPath}
                 className="bg-white hover:bg-gray-100 text-black font-extrabold text-xs px-5 py-2.5 rounded-full transition-all duration-300 shadow-md active:scale-95 font-space uppercase tracking-wider"
@@ -162,13 +189,6 @@ export default function Navbar() {
             </div>
           ) : (
             <div className="hidden md:flex items-center gap-6">
-              <a
-                href="tel:+919719205268"
-                className="bg-[#E7EFE9] hover:bg-[#DCE6DF] text-brand-forest font-semibold text-xs px-5 py-2.5 rounded-full transition-all duration-300 shadow-sm hover:shadow flex items-center gap-2 active:scale-95"
-              >
-                <HiPhone className="text-brand-forest shrink-0" size={14} />
-                <span>+91 9719205268</span>
-              </a>
               <Link
                 to="/login"
                 className="text-gray-300 hover:text-white font-medium text-sm transition-colors tracking-wide"
@@ -208,16 +228,27 @@ export default function Navbar() {
             className="absolute left-0 right-0 top-21 p-6 bg-white border-b border-brand-forest/15 shadow-2xl md:hidden z-40"
           >
             <div className="flex flex-col gap-4">
-              {menuItems.map((item) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  className="text-brand-text-muted hover:text-brand-forest transition-colors font-semibold text-base py-1"
-                  onClick={() => setIsOpen(false)}
-                >
-                  {item.label}
-                </a>
-              ))}
+              {menuItems.map((item) => {
+                const sectionId = item.href.replace("#", "");
+                const isActive = activeSection === sectionId;
+                return (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    className={`transition-colors font-semibold text-base py-1 ${
+                      isActive
+                        ? "text-brand-forest font-bold"
+                        : "text-brand-text-muted hover:text-brand-forest"
+                    }`}
+                    onClick={() => {
+                      setIsOpen(false);
+                      handleItemClick(item.href);
+                    }}
+                  >
+                    {item.label}
+                  </a>
+                );
+              })}
 
               <div className="h-px bg-brand-forest/10 my-2" />
 
@@ -271,14 +302,6 @@ export default function Navbar() {
                   >
                     Get Started
                   </Link>
-                  <a
-                    href="tel:+919719205268"
-                    className="w-full bg-white hover:bg-gray-50 text-brand-forest border border-brand-forest/20 font-semibold text-center py-3 rounded-full transition-all duration-300 text-sm shadow-sm flex items-center justify-center gap-2"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <HiPhone size={16} />
-                    <span>Call Us: +91 9719205268</span>
-                  </a>
                 </div>
               )}
             </div>
